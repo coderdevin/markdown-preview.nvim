@@ -552,6 +552,79 @@ body {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+/* ── Custom confirm dialog ── */
+.confirm-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(45, 42, 38, 0.3);
+  z-index: 30000;
+  animation: confirmFadeIn 150ms ease-out both;
+}
+.confirm-overlay.visible { display: flex; align-items: center; justify-content: center; }
+
+@keyframes confirmFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.confirm-dialog {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  padding: 24px;
+  width: 340px;
+  animation: confirmSlideIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes confirmSlideIn {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.confirm-dialog h4 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.confirm-dialog p {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirm-actions .btn-cancel {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.confirm-actions .btn-danger {
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-ui);
+  background: var(--danger);
+  color: #fff;
+  transition: background var(--transition);
+}
+
+.confirm-actions .btn-danger:hover { background: #a34845; }
 </style>
 </head>
 <body>
@@ -619,6 +692,17 @@ body {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
     Delete <span class="kbd-hint">D</span>
   </button>
+</div>
+
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-dialog">
+    <h4 id="confirmTitle">Clear all annotations?</h4>
+    <p id="confirmMessage">This will remove all annotations and highlights from this document. This cannot be undone.</p>
+    <div class="confirm-actions">
+      <button class="btn-cancel" id="confirmCancel">Cancel</button>
+      <button class="btn-danger" id="confirmOk">Clear All</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1163,19 +1247,33 @@ body {
   });
 
   // --- Clear All ---
+  // --- Custom confirm dialog ---
+  const confirmOverlay = document.getElementById('confirmOverlay');
+  const confirmCancel = document.getElementById('confirmCancel');
+  const confirmOk = document.getElementById('confirmOk');
+
+  function showConfirm(onConfirm) {
+    confirmOverlay.classList.add('visible');
+    var cleanup = () => { confirmOverlay.classList.remove('visible'); };
+    confirmOk.onclick = () => { cleanup(); onConfirm(); };
+    confirmCancel.onclick = cleanup;
+    confirmOverlay.addEventListener('click', (e) => {
+      if (e.target === confirmOverlay) cleanup();
+    }, { once: true });
+  }
+
   clearAllBtn.addEventListener('click', () => {
     if (annotations.length === 0) return;
-    if (!confirm('Remove all annotations?')) return;
-
-    try {
-      const doc = frame.contentDocument;
-      doc.querySelectorAll('[data-ann-id]').forEach(el => unwrapMark(el));
-    } catch(e) {}
-
-    annotations = [];
-    localStorage.removeItem(storageKey());
-    renderList();
-    showToast('All annotations cleared');
+    showConfirm(() => {
+      try {
+        const doc = frame.contentDocument;
+        doc.querySelectorAll('[data-ann-id]').forEach(el => unwrapMark(el));
+      } catch(e) {}
+      annotations = [];
+      localStorage.removeItem(storageKey());
+      renderList();
+      showToast('All annotations cleared');
+    });
   });
 
   document.addEventListener('mousedown', () => { hideToolbar(); });

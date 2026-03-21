@@ -829,27 +829,58 @@ body {
     } catch(e) {}
   }
 
+  function markClassName(type) {
+    return type === TYPE_DELETE ? 'ann-highlight-delete' : type === TYPE_ADD ? 'ann-highlight-add' : 'ann-highlight';
+  }
+
   function wrapRangeInMark(range, id, type) {
-    const doc = frame.contentDocument;
-    const mark = doc.createElement('mark');
-    mark.className = type === TYPE_DELETE ? 'ann-highlight-delete' : type === TYPE_ADD ? 'ann-highlight-add' : 'ann-highlight';
-    mark.dataset.annId = id;
-    try {
-      range.surroundContents(mark);
-    } catch(e) {
-      const frag = range.cloneContents();
-      mark.appendChild(frag);
-      range.deleteContents();
-      range.insertNode(mark);
+    var doc = frame.contentDocument;
+    var cls = markClassName(type);
+
+    // Collect text nodes within the range
+    var textNodes = [];
+    var walker = doc.createTreeWalker(range.commonAncestorContainer, NodeFilter.SHOW_TEXT, null, false);
+    var node;
+    while (node = walker.nextNode()) {
+      if (range.intersectsNode(node)) textNodes.push(node);
     }
-    return mark;
+    // If commonAncestor is itself a text node
+    if (range.commonAncestorContainer.nodeType === 3) {
+      textNodes = [range.commonAncestorContainer];
+    }
+
+    if (textNodes.length === 0) return null;
+
+    var firstMark = null;
+    textNodes.forEach(function(tn) {
+      var start = (tn === range.startContainer) ? range.startOffset : 0;
+      var end = (tn === range.endContainer) ? range.endOffset : tn.textContent.length;
+      if (start >= end) return;
+
+      var r = doc.createRange();
+      r.setStart(tn, start);
+      r.setEnd(tn, end);
+      var mark = doc.createElement('mark');
+      mark.className = cls;
+      mark.dataset.annId = id;
+      r.surroundContents(mark);
+      if (!firstMark) firstMark = mark;
+    });
+    return firstMark;
   }
 
   function unwrapMark(el) {
-    const parent = el.parentNode;
+    var parent = el.parentNode;
     while (el.firstChild) parent.insertBefore(el.firstChild, el);
     parent.removeChild(el);
     parent.normalize();
+  }
+
+  function unwrapAllMarks(id) {
+    try {
+      var doc = frame.contentDocument;
+      doc.querySelectorAll('[data-ann-id="' + id + '"]').forEach(function(el) { unwrapMark(el); });
+    } catch(e) {}
   }
 
   function highlightRange(range, id, type) {
@@ -1193,11 +1224,7 @@ body {
 
   function removeAnnotation(idx) {
     const ann = annotations[idx];
-    try {
-      const doc = frame.contentDocument;
-      const el = doc.querySelector(`[data-ann-id="${ann.id}"]`);
-      if (el) unwrapMark(el);
-    } catch(e) {}
+    unwrapAllMarks(ann.id);
 
     annotations.splice(idx, 1);
     saveAnnotations();

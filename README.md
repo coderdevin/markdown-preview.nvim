@@ -2,6 +2,11 @@
 
 > Forked from [iamcco/markdown-preview.nvim](https://github.com/iamcco/markdown-preview.nvim) with added **Markdown Annotator** feature.
 
+<img width="1704" height="982" alt="image" src="https://github.com/user-attachments/assets/b763d76a-98f9-41d2-92f0-3d9164575901" />
+
+<img width="1700" height="986" alt="image" src="https://github.com/user-attachments/assets/091612d7-fa9b-4946-90e7-ce06c31b87f0" />
+
+
 ### Introduction
 
 > It only works on Vim >= 8.1 and Neovim

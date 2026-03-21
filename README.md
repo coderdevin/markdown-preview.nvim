@@ -1,6 +1,6 @@
 <h1 align="center"> ✨ Markdown Preview for (Neo)vim ✨ </h1>
 
-> Powered by ❤️
+> Forked from [iamcco/markdown-preview.nvim](https://github.com/iamcco/markdown-preview.nvim) with added **Markdown Annotator** feature.
 
 ### Introduction
 
@@ -25,7 +25,7 @@ Main features:
 - Task lists
 - Local images
 - Flexible configuration
-- **Markdown Annotator** — highlight text and add notes directly on the preview
+- **Markdown Annotator** — review and annotate markdown with Modify / Add / Delete actions
 
 **Note** the plugin `mathjax-support-for-mkdp` is not needed for typesetting math.
 
@@ -39,24 +39,24 @@ Install with [vim-plug](https://github.com/junegunn/vim-plug):
 " If you don't have nodejs and yarn
 " use pre build, add 'vim-plug' to the filetype list so vim-plug can update this plugin
 " see: https://github.com/iamcco/markdown-preview.nvim/issues/50
-Plug 'iamcco/markdown-preview.nvim', { 'do': { -> mkdp#util#install() }, 'for': ['markdown', 'vim-plug']}
+Plug 'coderdevin/markdown-preview.nvim', { 'do': { -> mkdp#util#install() }, 'for': ['markdown', 'vim-plug']}
 
 
 " If you have nodejs
-Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && npx --yes yarn install' }
+Plug 'coderdevin/markdown-preview.nvim', { 'do': 'cd app && npx --yes yarn install' }
 ```
 
 Or install with [dein](https://github.com/Shougo/dein.vim):
 
 ```vim
-call dein#add('iamcco/markdown-preview.nvim', {'on_ft': ['markdown', 'pandoc.markdown', 'rmd'],
+call dein#add('coderdevin/markdown-preview.nvim', {'on_ft': ['markdown', 'pandoc.markdown', 'rmd'],
 					\ 'build': 'sh -c "cd app && npx --yes yarn install"' })
 ```
 
 Or with [minpac](https://github.com/k-takata/minpac):
 
 ```vim
-call minpac#add('iamcco/markdown-preview.nvim', {'do': 'packloadall! | call mkdp#util#install()'})
+call minpac#add('coderdevin/markdown-preview.nvim', {'do': 'packloadall! | call mkdp#util#install()'})
 ```
 
 Or with [Vundle](https://github.com/vundlevim/vundle.vim):
@@ -78,7 +78,7 @@ Add this in your `init.lua or plugins.lua`
 ```lua
 -- install without yarn or npm
 {
-    "iamcco/markdown-preview.nvim",
+    "coderdevin/markdown-preview.nvim",
     cmd = { "MarkdownPreviewToggle", "MarkdownPreview", "MarkdownPreviewStop" },
     ft = { "markdown" },
     build = function() vim.fn["mkdp#util#install"]() end,
@@ -86,7 +86,7 @@ Add this in your `init.lua or plugins.lua`
 
 -- install with yarn or npm
 {
-  "iamcco/markdown-preview.nvim",
+  "coderdevin/markdown-preview.nvim",
   cmd = { "MarkdownPreviewToggle", "MarkdownPreview", "MarkdownPreviewStop" },
   build = "cd app && yarn install",
   init = function()
@@ -103,11 +103,11 @@ Add this in your `init.lua or plugins.lua`
 ```lua
 -- install without yarn or npm
 use({
-    "iamcco/markdown-preview.nvim",
+    "coderdevin/markdown-preview.nvim",
     run = function() vim.fn["mkdp#util#install"]() end,
 })
 
-use({ "iamcco/markdown-preview.nvim", run = "cd app && npm install", setup = function() vim.g.mkdp_filetypes = { "markdown" } end, ft = { "markdown" }, })
+use({ "coderdevin/markdown-preview.nvim", run = "cd app && npm install", setup = function() vim.g.mkdp_filetypes = { "markdown" } end, ft = { "markdown" }, })
 ```
 
 Or by hand:
@@ -120,7 +120,7 @@ add plugin to the `~/.local/share/nvim/site/pack/packer/start/` directory:
 
 ```vim
 cd ~/.local/share/nvim/site/pack/packer/start/
-git clone https://github.com/iamcco/markdown-preview.nvim.git
+git clone https://github.com/coderdevin/markdown-preview.nvim.git
 cd markdown-preview.nvim
 npx --yes yarn install
 npx --yes yarn build
@@ -276,15 +276,22 @@ Commands:
 
 ### Markdown Annotator
 
-The annotator lets you highlight text and add notes on top of the live markdown preview. It opens in a separate browser tab with the preview embedded in an iframe (same-origin).
+The annotator opens a review interface for your markdown — select text and annotate it with **Modify**, **Add**, or **Delete** actions. Designed for the workflow: annotate → Copy All → paste to AI for document review.
+
+**Annotation types:**
+- **Modify** (`M`) — select text + describe what to change
+- **Add** (`A`) — select anchor text + describe what to insert after it
+- **Delete** (`D`) — mark text for removal (with optional reason)
 
 **Features:**
-- Select text in the preview to highlight and annotate
-- Side panel lists all annotations with their notes
-- **Copy All** — exports annotations as a markdown summary to clipboard
-- **Clear All** — removes all annotations
+- Warm editorial UI with floating popover for notes
+- Side panel lists all annotations with type badges and editable notes
+- **Copy All** — exports AI-friendly structured format with `[MODIFY]`/`[ADD]`/`[DELETE]` tags
+- **Clear All** — custom confirmation dialog
+- Keyboard shortcuts: press `M`, `A`, or `D` when toolbar is visible
 - Annotations persist in browser localStorage (keyed by filename)
-- Live sync — edits in Vim are reflected in the annotator preview in real time
+- Live sync — edits in Vim are reflected in the annotator in real time
+- Cross-element selections handled safely (no layout corruption)
 
 **Usage:**
 
@@ -294,6 +301,28 @@ The annotator lets you highlight text and add notes on top of the live markdown 
 
 " Or map to a key
 nmap <leader>a <Plug>MarkdownAnnotate
+```
+
+**Copy All output format (optimized for AI):**
+```markdown
+# Document Review: filename
+
+## Annotations
+
+### 1. [MODIFY]
+> original text
+**Change to:** what should be changed
+
+### 2. [ADD]
+> anchor text
+**Insert after:** content to add
+
+### 3. [DELETE]
+> ~~text to remove~~
+**Reason:** why it should be removed
+
+---
+Please review these annotations and suggest improvements to the document.
 ```
 
 ### Custom Examples

@@ -361,24 +361,37 @@ body {
   flex-shrink: 0;
 }
 
-/* ── Inline note editor ── */
-.note-editor {
+/* ── Floating note popover ── */
+.note-popover-overlay {
   display: none;
-  padding: 12px;
-  border-top: 1px solid var(--border);
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+}
+
+.note-popover-overlay.visible { display: block; }
+
+.note-popover {
+  position: fixed;
+  display: none;
+  z-index: 12000;
+  width: 340px;
   background: var(--bg);
-  flex-shrink: 0;
-  animation: editorIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 16px;
+  animation: popoverIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes editorIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes popoverIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.note-editor.visible { display: block; }
+.note-popover.visible { display: block; }
 
-.note-editor-label {
+.note-popover-label {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -387,7 +400,7 @@ body {
   margin-bottom: 8px;
 }
 
-.note-editor-selected {
+.note-popover-selected {
   font-family: var(--font-display);
   font-size: 13px;
   font-style: italic;
@@ -401,7 +414,7 @@ body {
   line-height: 1.5;
 }
 
-.note-editor textarea {
+.note-popover textarea {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--border);
@@ -416,16 +429,16 @@ body {
   transition: border-color var(--transition), box-shadow var(--transition);
 }
 
-.note-editor textarea:focus {
+.note-popover textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-light);
 }
 
-.note-editor-actions {
+.note-popover-actions {
   display: flex;
   justify-content: flex-end;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .btn-save {
@@ -460,6 +473,20 @@ body {
   background: var(--bg-hover);
   color: var(--text);
 }
+
+/* ── Editable note on annotation items ── */
+.ann-item .note-text { cursor: pointer; }
+.ann-item .note-text:hover { color: var(--text); }
+.ann-item .add-note-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.ann-item:hover .add-note-hint { opacity: 1; }
+.ann-item .add-note-hint:hover { color: var(--accent); }
 
 /* Confirmation toast */
 .toast {
@@ -522,15 +549,17 @@ body {
         <p>Select any text in the preview to highlight and annotate it</p>
       </div>
     </div>
-    <div class="note-editor" id="noteEditor">
-      <div class="note-editor-label">New annotation</div>
-      <div class="note-editor-selected" id="noteEditorSelected"></div>
-      <textarea id="noteEditorInput" rows="2" placeholder="Add a note (optional)"></textarea>
-      <div class="note-editor-actions">
-        <button class="btn-cancel" id="noteEditorCancel">Cancel</button>
-        <button class="btn-save" id="noteEditorSave">Save</button>
-      </div>
-    </div>
+  </div>
+</div>
+
+<div class="note-popover-overlay" id="noteOverlay"></div>
+<div class="note-popover" id="notePopover">
+  <div class="note-popover-label" id="notePopoverLabel">New annotation</div>
+  <div class="note-popover-selected" id="notePopoverSelected"></div>
+  <textarea id="notePopoverInput" rows="2" placeholder="Add a note (optional)"></textarea>
+  <div class="note-popover-actions">
+    <button class="btn-cancel" id="notePopoverCancel">Cancel</button>
+    <button class="btn-save" id="notePopoverSave">Save</button>
   </div>
 </div>
 
@@ -559,11 +588,13 @@ body {
   const copyAllBtn = document.getElementById('copyAllBtn');
   const clearAllBtn = document.getElementById('clearAllBtn');
   const annCount = document.getElementById('annCount');
-  const noteEditor = document.getElementById('noteEditor');
-  const noteEditorSelected = document.getElementById('noteEditorSelected');
-  const noteEditorInput = document.getElementById('noteEditorInput');
-  const noteEditorCancel = document.getElementById('noteEditorCancel');
-  const noteEditorSave = document.getElementById('noteEditorSave');
+  const noteOverlay = document.getElementById('noteOverlay');
+  const notePopover = document.getElementById('notePopover');
+  const notePopoverLabel = document.getElementById('notePopoverLabel');
+  const notePopoverSelected = document.getElementById('notePopoverSelected');
+  const notePopoverInput = document.getElementById('notePopoverInput');
+  const notePopoverCancel = document.getElementById('notePopoverCancel');
+  const notePopoverSave = document.getElementById('notePopoverSave');
   const toastEl = document.getElementById('toast');
 
   let annotations = [];
@@ -770,27 +801,71 @@ body {
 
   toolbar.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
 
-  // --- Note editor ---
-  function openNoteEditor() {
+  // --- Popover positioning ---
+  let popoverPosition = { x: 0, y: 0 };
+  let editingAnnotationIdx = -1;
+
+  function positionPopover(x, y) {
+    const pw = 340, ph = 260;
+    if (x + pw > window.innerWidth) x = window.innerWidth - pw - 16;
+    if (x < 16) x = 16;
+    if (y + ph > window.innerHeight) y = y - ph - 10;
+    if (y < 16) y = 16;
+    notePopover.style.left = x + 'px';
+    notePopover.style.top = y + 'px';
+  }
+
+  function openPopoverForNew(x, y) {
     if (!currentSelection) return;
+    editingAnnotationIdx = -1;
+    notePopoverLabel.textContent = 'New annotation';
     const truncated = currentSelection.text.length > 120
       ? currentSelection.text.substring(0, 120) + '...'
       : currentSelection.text;
-    noteEditorSelected.textContent = truncated;
-    noteEditorInput.value = '';
-    noteEditor.classList.add('visible');
-    setTimeout(() => noteEditorInput.focus(), 50);
+    notePopoverSelected.textContent = truncated;
+    notePopoverSelected.style.display = '';
+    notePopoverInput.value = '';
+    positionPopover(x, y);
+    noteOverlay.classList.add('visible');
+    notePopover.classList.add('visible');
+    setTimeout(() => notePopoverInput.focus(), 50);
   }
 
-  function closeNoteEditor() {
-    noteEditor.classList.remove('visible');
+  function openPopoverForEdit(idx, anchorEl) {
+    const ann = annotations[idx];
+    if (!ann) return;
+    editingAnnotationIdx = idx;
+    notePopoverLabel.textContent = 'Edit note';
+    const truncated = ann.text.length > 120 ? ann.text.substring(0, 120) + '...' : ann.text;
+    notePopoverSelected.textContent = truncated;
+    notePopoverSelected.style.display = '';
+    notePopoverInput.value = ann.note || '';
+    const rect = anchorEl.getBoundingClientRect();
+    positionPopover(rect.left, rect.bottom + 6);
+    noteOverlay.classList.add('visible');
+    notePopover.classList.add('visible');
+    setTimeout(() => { notePopoverInput.focus(); notePopoverInput.select(); }, 50);
+  }
+
+  function closePopover() {
+    noteOverlay.classList.remove('visible');
+    notePopover.classList.remove('visible');
+    editingAnnotationIdx = -1;
     currentSelection = null;
   }
 
-  function commitAnnotation() {
-    if (!currentSelection) { closeNoteEditor(); return; }
+  function commitFromPopover() {
+    if (editingAnnotationIdx >= 0) {
+      annotations[editingAnnotationIdx].note = notePopoverInput.value.trim();
+      saveAnnotations();
+      renderList();
+      closePopover();
+      return;
+    }
 
-    const note = noteEditorInput.value.trim();
+    if (!currentSelection) { closePopover(); return; }
+
+    const note = notePopoverInput.value.trim();
     const id = 'ann-' + (++highlightCounter);
     const ann = {
       id: id,
@@ -805,22 +880,26 @@ body {
     annotations.push(ann);
     saveAnnotations();
     renderList();
-    closeNoteEditor();
+    closePopover();
   }
 
   toolbar.querySelector('button').addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    const iframeRect = frame.getBoundingClientRect();
+    popoverPosition.x = iframeRect.left + e.clientX;
+    popoverPosition.y = iframeRect.top + e.clientY + 10;
     hideToolbar();
-    openNoteEditor();
+    openPopoverForNew(popoverPosition.x, popoverPosition.y);
   });
 
-  noteEditorCancel.addEventListener('click', closeNoteEditor);
-  noteEditorSave.addEventListener('click', commitAnnotation);
+  noteOverlay.addEventListener('click', closePopover);
+  notePopoverCancel.addEventListener('click', closePopover);
+  notePopoverSave.addEventListener('click', commitFromPopover);
 
-  noteEditorInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitAnnotation(); }
-    if (e.key === 'Escape') closeNoteEditor();
+  notePopoverInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitFromPopover(); }
+    if (e.key === 'Escape') closePopover();
   });
 
   // --- Render ---
@@ -844,7 +923,9 @@ body {
       item.style.animationDelay = (idx * 30) + 'ms';
 
       const truncText = ann.text.length > 100 ? ann.text.substring(0, 100) + '...' : ann.text;
-      const noteHtml = ann.note ? `<div class="note">${escapeHtml(ann.note)}</div>` : '';
+      const noteHtml = ann.note
+        ? `<div class="note"><span class="note-text">${escapeHtml(ann.note)}</span></div>`
+        : `<div class="add-note-hint">Click to add a note</div>`;
 
       item.innerHTML = `
         <button class="remove-btn" data-idx="${idx}" title="Remove">&times;</button>
@@ -854,6 +935,11 @@ body {
 
       item.addEventListener('click', (e) => {
         if (e.target.classList.contains('remove-btn')) return;
+        if (e.target.classList.contains('note-text') || e.target.classList.contains('add-note-hint')) {
+          e.stopPropagation();
+          openPopoverForEdit(idx, item);
+          return;
+        }
         scrollToAnnotation(ann.id);
       });
 

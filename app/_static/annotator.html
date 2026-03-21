@@ -22,6 +22,7 @@
   --accent-wash: rgba(196, 112, 75, 0.12);
   --danger: #B85450;
   --danger-light: rgba(184, 84, 80, 0.08);
+  --danger-wash: rgba(184, 84, 80, 0.12);
   --success: #5B8A5E;
   --radius: 10px;
   --radius-sm: 6px;
@@ -375,7 +376,7 @@ body {
   position: fixed;
   display: none;
   z-index: 12000;
-  width: 340px;
+  width: 420px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -409,7 +410,7 @@ body {
   background: var(--accent-light);
   border-radius: var(--radius-sm);
   margin-bottom: 10px;
-  max-height: 52px;
+  max-height: 72px;
   overflow: hidden;
   line-height: 1.5;
 }
@@ -488,6 +489,42 @@ body {
 .ann-item:hover .add-note-hint { opacity: 1; }
 .ann-item .add-note-hint:hover { color: var(--accent); }
 
+/* ── Delete type annotations ── */
+.ann-item[data-type="delete"] .snippet { text-decoration: line-through; color: var(--danger); }
+.ann-item[data-type="delete"] .snippet::before,
+.ann-item[data-type="delete"] .snippet::after { color: var(--danger); }
+.ann-item[data-type="delete"] .note { border-left-color: var(--danger-wash); }
+
+.ann-item .type-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+.type-badge.highlight { background: var(--accent-light); color: var(--accent); }
+.type-badge.delete { background: var(--danger-light); color: var(--danger); }
+
+/* ── Toolbar keyboard hints ── */
+.ann-toolbar .kbd-hint {
+  font-size: 10px;
+  opacity: 0.5;
+  padding: 1px 4px;
+  border: 1px solid rgba(249,247,243,0.25);
+  border-radius: 3px;
+  margin-left: 2px;
+}
+
+.ann-toolbar .divider {
+  width: 1px;
+  background: rgba(249,247,243,0.15);
+  margin: 4px 2px;
+  flex-shrink: 0;
+}
+
 /* Confirmation toast */
 .toast {
   position: fixed;
@@ -546,7 +583,7 @@ body {
     <div class="ann-list" id="annList">
       <div class="empty-state" id="emptyState">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-        <p>Select any text in the preview to highlight and annotate it</p>
+        <p>Select any text in the preview, then press <kbd>H</kbd> to highlight or <kbd>D</kbd> to mark for deletion</p>
       </div>
     </div>
   </div>
@@ -556,7 +593,7 @@ body {
 <div class="note-popover" id="notePopover">
   <div class="note-popover-label" id="notePopoverLabel">New annotation</div>
   <div class="note-popover-selected" id="notePopoverSelected"></div>
-  <textarea id="notePopoverInput" rows="2" placeholder="Add a note (optional)"></textarea>
+  <textarea id="notePopoverInput" rows="3" placeholder="Add a note (optional)"></textarea>
   <div class="note-popover-actions">
     <button class="btn-cancel" id="notePopoverCancel">Cancel</button>
     <button class="btn-save" id="notePopoverSave">Save</button>
@@ -566,7 +603,12 @@ body {
 <div class="ann-toolbar" id="annToolbar">
   <button data-action="annotate">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-    Annotate
+    Annotate <span class="kbd-hint">H</span>
+  </button>
+  <div class="divider"></div>
+  <button data-action="delete">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Delete <span class="kbd-hint">D</span>
   </button>
 </div>
 
@@ -576,7 +618,7 @@ body {
 (function() {
   'use strict';
 
-  var HIGHLIGHT_CSS = '.ann-highlight { background: rgba(196, 112, 75, 0.14) !important; border-bottom: 2px solid rgba(196, 112, 75, 0.5) !important; cursor: pointer !important; transition: background 0.15s ease !important; } .ann-highlight:hover { background: rgba(196, 112, 75, 0.25) !important; }';
+  var HIGHLIGHT_CSS = '.ann-highlight { background: rgba(196, 112, 75, 0.14) !important; border-bottom: 2px solid rgba(196, 112, 75, 0.5) !important; cursor: pointer !important; transition: background 0.15s ease !important; } .ann-highlight:hover { background: rgba(196, 112, 75, 0.25) !important; } .ann-highlight-delete { background: rgba(184, 84, 80, 0.1) !important; border-bottom: 2px solid rgba(184, 84, 80, 0.5) !important; text-decoration: line-through !important; cursor: pointer !important; transition: background 0.15s ease !important; } .ann-highlight-delete:hover { background: rgba(184, 84, 80, 0.2) !important; }';
 
   const frame = document.getElementById('previewFrame');
   const toolbar = document.getElementById('annToolbar');
@@ -634,7 +676,7 @@ body {
   function saveAnnotations() {
     try {
       const data = annotations.map(a => ({
-        id: a.id, text: a.text, note: a.note, context: a.context
+        id: a.id, type: a.type, text: a.text, note: a.note, context: a.context
       }));
       localStorage.setItem(storageKey(), JSON.stringify(data));
     } catch(e) {}
@@ -653,6 +695,9 @@ body {
   function updateCount() {
     annCount.textContent = annotations.length;
     annCount.classList.toggle('visible', annotations.length > 0);
+    copyAllBtn.textContent = annotations.length > 0
+      ? 'Copy All (' + annotations.length + ')'
+      : 'Copy All';
   }
 
   // --- URL handling ---
@@ -674,10 +719,10 @@ body {
     } catch(e) {}
   }
 
-  function wrapRangeInMark(range, id) {
+  function wrapRangeInMark(range, id, type) {
     const doc = frame.contentDocument;
     const mark = doc.createElement('mark');
-    mark.className = 'ann-highlight';
+    mark.className = type === 'delete' ? 'ann-highlight-delete' : 'ann-highlight';
     mark.dataset.annId = id;
     try {
       range.surroundContents(mark);
@@ -697,10 +742,10 @@ body {
     parent.normalize();
   }
 
-  function highlightRange(range, id) {
+  function highlightRange(range, id, type) {
     try {
       if (!frame.contentDocument) return null;
-      return wrapRangeInMark(range, id);
+      return wrapRangeInMark(range, id, type);
     } catch(e) { return null; }
   }
 
@@ -711,12 +756,12 @@ body {
       injectStyles();
       annotations.forEach(ann => {
         if (!ann.text) return;
-        findAndHighlight(doc.body, ann.text, ann.id);
+        findAndHighlight(doc.body, ann.text, ann.id, ann.type);
       });
     } catch(e) {}
   }
 
-  function findAndHighlight(root, text, id) {
+  function findAndHighlight(root, text, id, type) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
     const searchText = text.substring(0, 100);
     let node;
@@ -727,7 +772,7 @@ body {
         const range = doc.createRange();
         range.setStart(node, idx);
         range.setEnd(node, Math.min(idx + text.length, node.textContent.length));
-        try { wrapRangeInMark(range, id); } catch(e) {}
+        try { wrapRangeInMark(range, id, type); } catch(e) {}
         return true;
       }
     }
@@ -765,6 +810,13 @@ body {
         }
       });
 
+      doc.addEventListener('keydown', (e) => {
+        if (!toolbar.classList.contains('visible')) return;
+        if (e.key === 'h' || e.key === 'H') { e.preventDefault(); doAnnotateAction(lastToolbarEvent); }
+        if (e.key === 'd' || e.key === 'D') { e.preventDefault(); doDeleteAction(lastToolbarEvent); }
+        if (e.key === 'Escape') hideToolbar();
+      });
+
       reapplyHighlights();
     } catch(e) {
       console.warn('Cannot access iframe. Highlights won\'t show in preview.');
@@ -785,7 +837,7 @@ body {
     let x = iframeRect.left + e.clientX;
     let y = iframeRect.top + e.clientY - 50;
 
-    const tw = 130;
+    const tw = 260;
     if (x + tw > window.innerWidth) x = window.innerWidth - tw - 10;
     if (x < 10) x = 10;
     if (y < 10) y = iframeRect.top + e.clientY + 20;
@@ -806,7 +858,7 @@ body {
   let editingAnnotationIdx = -1;
 
   function positionPopover(x, y) {
-    const pw = 340, ph = 260;
+    const pw = 420, ph = 300;
     if (x + pw > window.innerWidth) x = window.innerWidth - pw - 16;
     if (x < 16) x = 16;
     if (y + ph > window.innerHeight) y = y - ph - 10;
@@ -869,12 +921,13 @@ body {
     const id = 'ann-' + (++highlightCounter);
     const ann = {
       id: id,
+      type: 'highlight',
       text: currentSelection.text.substring(0, 500),
       note: note,
       context: currentSelection.text.substring(0, 60)
     };
 
-    highlightRange(currentSelection.range, id);
+    highlightRange(currentSelection.range, id, 'highlight');
     try { frame.contentDocument.getSelection().removeAllRanges(); } catch(e) {}
 
     annotations.push(ann);
@@ -883,14 +936,56 @@ body {
     closePopover();
   }
 
-  toolbar.querySelector('button').addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  let lastToolbarEvent = null;
+
+  function getPopoverXY(e) {
     const iframeRect = frame.getBoundingClientRect();
-    popoverPosition.x = iframeRect.left + e.clientX;
-    popoverPosition.y = iframeRect.top + e.clientY + 10;
+    return { x: iframeRect.left + e.clientX, y: iframeRect.top + e.clientY + 10 };
+  }
+
+  function doAnnotateAction(e) {
+    const pos = e ? getPopoverXY(e) : popoverPosition;
+    popoverPosition = pos;
     hideToolbar();
-    openPopoverForNew(popoverPosition.x, popoverPosition.y);
+    openPopoverForNew(pos.x, pos.y);
+  }
+
+  function doDeleteAction(e) {
+    if (!currentSelection) return;
+    hideToolbar();
+    const id = 'ann-' + (++highlightCounter);
+    const ann = {
+      id: id,
+      type: 'delete',
+      text: currentSelection.text.substring(0, 500),
+      note: '',
+      context: currentSelection.text.substring(0, 60)
+    };
+    highlightRange(currentSelection.range, id, 'delete');
+    try { frame.contentDocument.getSelection().removeAllRanges(); } catch(ex) {}
+    annotations.push(ann);
+    saveAnnotations();
+    renderList();
+    currentSelection = null;
+    showToast('Marked for deletion');
+  }
+
+  toolbar.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      lastToolbarEvent = e;
+      if (btn.dataset.action === 'delete') doDeleteAction(e);
+      else doAnnotateAction(e);
+    });
+  });
+
+  // Keyboard shortcuts when toolbar is visible
+  document.addEventListener('keydown', (e) => {
+    if (!toolbar.classList.contains('visible')) return;
+    if (e.key === 'h' || e.key === 'H') { e.preventDefault(); doAnnotateAction(lastToolbarEvent); }
+    if (e.key === 'd' || e.key === 'D') { e.preventDefault(); doDeleteAction(lastToolbarEvent); }
+    if (e.key === 'Escape') hideToolbar();
   });
 
   noteOverlay.addEventListener('click', closePopover);
@@ -922,13 +1017,18 @@ body {
       item.dataset.id = ann.id;
       item.style.animationDelay = (idx * 30) + 'ms';
 
+      const annType = ann.type || 'highlight';
+      item.dataset.type = annType;
       const truncText = ann.text.length > 100 ? ann.text.substring(0, 100) + '...' : ann.text;
+      const badgeClass = annType === 'delete' ? 'delete' : 'highlight';
+      const badgeLabel = annType === 'delete' ? 'Delete' : 'Highlight';
       const noteHtml = ann.note
         ? `<div class="note"><span class="note-text">${escapeHtml(ann.note)}</span></div>`
         : `<div class="add-note-hint">Click to add a note</div>`;
 
       item.innerHTML = `
         <button class="remove-btn" data-idx="${idx}" title="Remove">&times;</button>
+        <span class="type-badge ${badgeClass}">${badgeLabel}</span>
         <div class="snippet">${escapeHtml(truncText)}</div>
         ${noteHtml}
       `;
@@ -992,13 +1092,23 @@ body {
     try { title = frame.contentDocument.title || urlInput.value.trim(); }
     catch(e) { title = urlInput.value.trim(); }
 
-    let md = `## Annotations \u2014 ${title}\n\n`;
-    annotations.forEach(ann => {
-      const text = ann.text.replace(/\n/g, ' ').substring(0, 200);
-      md += ann.note
-        ? `- \u201C${text}\u201D \u2014 ${ann.note}\n`
-        : `- \u201C${text}\u201D\n`;
+    let md = `# Document Review: ${title}\n\n`;
+    md += `Below are annotations on this document. Each annotation includes the original text and a reviewer note.\n\n`;
+    md += `## Annotations\n\n`;
+    annotations.forEach((ann, i) => {
+      const annType = (ann.type || 'highlight').toUpperCase();
+      const text = ann.text.replace(/\n/g, ' ');
+      md += `### ${i + 1}. [${annType}]\n`;
+      if (ann.type === 'delete') {
+        md += `> ~~${text}~~\n`;
+        if (ann.note) md += `\n**Reason:** ${ann.note}\n`;
+      } else {
+        md += `> ${text}\n`;
+        if (ann.note) md += `\n**Note:** ${ann.note}\n`;
+      }
+      md += `\n`;
     });
+    md += `---\nPlease review these annotations and suggest improvements to the document.\n`;
 
     navigator.clipboard.writeText(md).then(() => {
       showToast('Copied to clipboard');

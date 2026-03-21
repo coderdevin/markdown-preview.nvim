@@ -618,7 +618,15 @@ body {
 (function() {
   'use strict';
 
-  var HIGHLIGHT_CSS = '.ann-highlight { background: rgba(196, 112, 75, 0.14) !important; border-bottom: 2px solid rgba(196, 112, 75, 0.5) !important; cursor: pointer !important; transition: background 0.15s ease !important; } .ann-highlight:hover { background: rgba(196, 112, 75, 0.25) !important; } .ann-highlight-delete { background: rgba(184, 84, 80, 0.1) !important; border-bottom: 2px solid rgba(184, 84, 80, 0.5) !important; text-decoration: line-through !important; cursor: pointer !important; transition: background 0.15s ease !important; } .ann-highlight-delete:hover { background: rgba(184, 84, 80, 0.2) !important; }';
+  var TYPE_HIGHLIGHT = 'highlight';
+  var TYPE_DELETE = 'delete';
+
+  var HIGHLIGHT_CSS = [
+    '.ann-highlight { background: rgba(196,112,75,0.14) !important; border-bottom: 2px solid rgba(196,112,75,0.5) !important; cursor: pointer !important; transition: background 0.15s ease !important; }',
+    '.ann-highlight:hover { background: rgba(196,112,75,0.25) !important; }',
+    '.ann-highlight-delete { background: rgba(184,84,80,0.1) !important; border-bottom: 2px solid rgba(184,84,80,0.5) !important; text-decoration: line-through !important; cursor: pointer !important; transition: background 0.15s ease !important; }',
+    '.ann-highlight-delete:hover { background: rgba(184,84,80,0.2) !important; }'
+  ].join('\n');
 
   const frame = document.getElementById('previewFrame');
   const toolbar = document.getElementById('annToolbar');
@@ -692,11 +700,14 @@ body {
     } catch(e) { annotations = []; }
   }
 
+  var lastCount = -1;
   function updateCount() {
-    annCount.textContent = annotations.length;
-    annCount.classList.toggle('visible', annotations.length > 0);
-    copyAllBtn.textContent = annotations.length > 0
-      ? 'Copy All (' + annotations.length + ')'
+    if (annotations.length === lastCount) return;
+    lastCount = annotations.length;
+    annCount.textContent = lastCount;
+    annCount.classList.toggle('visible', lastCount > 0);
+    copyAllBtn.textContent = lastCount > 0
+      ? 'Copy All (' + lastCount + ')'
       : 'Copy All';
   }
 
@@ -722,7 +733,7 @@ body {
   function wrapRangeInMark(range, id, type) {
     const doc = frame.contentDocument;
     const mark = doc.createElement('mark');
-    mark.className = type === 'delete' ? 'ann-highlight-delete' : 'ann-highlight';
+    mark.className = type === TYPE_DELETE ? 'ann-highlight-delete' : 'ann-highlight';
     mark.dataset.annId = id;
     try {
       range.surroundContents(mark);
@@ -762,13 +773,13 @@ body {
   }
 
   function findAndHighlight(root, text, id, type) {
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+    const doc = frame.contentDocument;
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
     const searchText = text.substring(0, 100);
     let node;
     while (node = walker.nextNode()) {
       const idx = node.textContent.indexOf(searchText);
       if (idx !== -1) {
-        const doc = frame.contentDocument;
         const range = doc.createRange();
         range.setStart(node, idx);
         range.setEnd(node, Math.min(idx + text.length, node.textContent.length));
@@ -810,12 +821,7 @@ body {
         }
       });
 
-      doc.addEventListener('keydown', (e) => {
-        if (!toolbar.classList.contains('visible')) return;
-        if (e.key === 'h' || e.key === 'H') { e.preventDefault(); doAnnotateAction(lastToolbarEvent); }
-        if (e.key === 'd' || e.key === 'D') { e.preventDefault(); doDeleteAction(lastToolbarEvent); }
-        if (e.key === 'Escape') hideToolbar();
-      });
+      doc.addEventListener('keydown', handleToolbarKeydown);
 
       reapplyHighlights();
     } catch(e) {
@@ -832,10 +838,16 @@ body {
   });
 
   // --- Toolbar ---
+  // Stores the position of the last selection for popover placement
+  var lastSelectionPos = { x: 0, y: 0 };
+
   function showToolbar(e) {
     const iframeRect = frame.getBoundingClientRect();
     let x = iframeRect.left + e.clientX;
     let y = iframeRect.top + e.clientY - 50;
+
+    // Save selection position for popover use by keyboard shortcuts
+    lastSelectionPos = { x: iframeRect.left + e.clientX, y: iframeRect.top + e.clientY + 10 };
 
     const tw = 260;
     if (x + tw > window.innerWidth) x = window.innerWidth - tw - 10;
@@ -921,13 +933,13 @@ body {
     const id = 'ann-' + (++highlightCounter);
     const ann = {
       id: id,
-      type: 'highlight',
+      type: TYPE_HIGHLIGHT,
       text: currentSelection.text.substring(0, 500),
       note: note,
       context: currentSelection.text.substring(0, 60)
     };
 
-    highlightRange(currentSelection.range, id, 'highlight');
+    highlightRange(currentSelection.range, id, TYPE_HIGHLIGHT);
     try { frame.contentDocument.getSelection().removeAllRanges(); } catch(e) {}
 
     annotations.push(ann);
@@ -936,32 +948,24 @@ body {
     closePopover();
   }
 
-  let lastToolbarEvent = null;
-
-  function getPopoverXY(e) {
-    const iframeRect = frame.getBoundingClientRect();
-    return { x: iframeRect.left + e.clientX, y: iframeRect.top + e.clientY + 10 };
-  }
-
-  function doAnnotateAction(e) {
-    const pos = e ? getPopoverXY(e) : popoverPosition;
-    popoverPosition = pos;
+  function doAnnotateAction() {
     hideToolbar();
-    openPopoverForNew(pos.x, pos.y);
+    popoverPosition = lastSelectionPos;
+    openPopoverForNew(lastSelectionPos.x, lastSelectionPos.y);
   }
 
-  function doDeleteAction(e) {
+  function doDeleteAction() {
     if (!currentSelection) return;
     hideToolbar();
     const id = 'ann-' + (++highlightCounter);
     const ann = {
       id: id,
-      type: 'delete',
+      type: TYPE_DELETE,
       text: currentSelection.text.substring(0, 500),
       note: '',
       context: currentSelection.text.substring(0, 60)
     };
-    highlightRange(currentSelection.range, id, 'delete');
+    highlightRange(currentSelection.range, id, TYPE_DELETE);
     try { frame.contentDocument.getSelection().removeAllRanges(); } catch(ex) {}
     annotations.push(ann);
     saveAnnotations();
@@ -970,23 +974,23 @@ body {
     showToast('Marked for deletion');
   }
 
+  function handleToolbarKeydown(e) {
+    if (!toolbar.classList.contains('visible')) return;
+    if (e.key === 'h' || e.key === 'H') { e.preventDefault(); doAnnotateAction(); }
+    if (e.key === 'd' || e.key === 'D') { e.preventDefault(); doDeleteAction(); }
+    if (e.key === 'Escape') hideToolbar();
+  }
+
   toolbar.querySelectorAll('button').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      lastToolbarEvent = e;
-      if (btn.dataset.action === 'delete') doDeleteAction(e);
-      else doAnnotateAction(e);
+      if (btn.dataset.action === 'delete') doDeleteAction();
+      else doAnnotateAction();
     });
   });
 
-  // Keyboard shortcuts when toolbar is visible
-  document.addEventListener('keydown', (e) => {
-    if (!toolbar.classList.contains('visible')) return;
-    if (e.key === 'h' || e.key === 'H') { e.preventDefault(); doAnnotateAction(lastToolbarEvent); }
-    if (e.key === 'd' || e.key === 'D') { e.preventDefault(); doDeleteAction(lastToolbarEvent); }
-    if (e.key === 'Escape') hideToolbar();
-  });
+  document.addEventListener('keydown', handleToolbarKeydown);
 
   noteOverlay.addEventListener('click', closePopover);
   notePopoverCancel.addEventListener('click', closePopover);
@@ -1017,7 +1021,7 @@ body {
       item.dataset.id = ann.id;
       item.style.animationDelay = (idx * 30) + 'ms';
 
-      const annType = ann.type || 'highlight';
+      const annType = ann.type || TYPE_HIGHLIGHT;
       item.dataset.type = annType;
       const truncText = ann.text.length > 100 ? ann.text.substring(0, 100) + '...' : ann.text;
       const badgeClass = annType === 'delete' ? 'delete' : 'highlight';
@@ -1096,10 +1100,10 @@ body {
     md += `Below are annotations on this document. Each annotation includes the original text and a reviewer note.\n\n`;
     md += `## Annotations\n\n`;
     annotations.forEach((ann, i) => {
-      const annType = (ann.type || 'highlight').toUpperCase();
+      const annType = (ann.type || TYPE_HIGHLIGHT).toUpperCase();
       const text = ann.text.replace(/\n/g, ' ');
       md += `### ${i + 1}. [${annType}]\n`;
-      if (ann.type === 'delete') {
+      if (ann.type === TYPE_DELETE) {
         md += `> ~~${text}~~\n`;
         if (ann.note) md += `\n**Reason:** ${ann.note}\n`;
       } else {

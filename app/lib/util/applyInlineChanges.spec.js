@@ -59,6 +59,36 @@ function run () {
     assert.strictEqual(result.applied, 1)
     assert.strictEqual(result.content, '- item!\r\n')
   }
+
+  {
+    const content = '**bold** text'
+    const result = applyInlineChangesToContent(content, [
+      {
+        line: 0,
+        oldText: 'bold ',
+        newText: '',
+        oldLineText: 'bold text',
+        newLineText: 'text'
+      }
+    ])
+    assert.strictEqual(result.applied, 1)
+    assert.strictEqual(result.content, 'text')
+  }
+
+  {
+    const content = '- **bold** text'
+    const result = applyInlineChangesToContent(content, [
+      {
+        line: 0,
+        oldText: 'bold ',
+        newText: '',
+        oldLineText: 'bold text',
+        newLineText: 'text'
+      }
+    ])
+    assert.strictEqual(result.applied, 1)
+    assert.strictEqual(result.content, '- text')
+  }
 }
 
 if (require.main === module) {

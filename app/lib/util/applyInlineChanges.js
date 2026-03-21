@@ -1,3 +1,16 @@
+function getMarkdownLinePrefix (line) {
+  const prefixMatch = line.match(/^(\s*(?:(?:[-+*]|\d+\.)\s+|#{1,6}\s+|(?:>\s*)+))/)
+  return prefixMatch ? prefixMatch[1] : ''
+}
+
+function applyLineOverwriteFallback (currentLine, newLineText) {
+  const prefix = getMarkdownLinePrefix(currentLine)
+  if (prefix) {
+    return prefix + newLineText
+  }
+  return newLineText
+}
+
 function applyInlineChangesToContent (content, changes) {
   const lineEnding = content.includes('\r\n') ? '\r\n' : '\n'
   const lines = content.split(/\r?\n/)
@@ -21,6 +34,13 @@ function applyInlineChangesToContent (content, changes) {
       const segmentStart = currentLine.indexOf(oldLineText)
       if (segmentStart !== -1) {
         lines[line] = currentLine.slice(0, segmentStart) + newLineText + currentLine.slice(segmentStart + oldLineText.length)
+        applied++
+        continue
+      }
+
+      const fallbackLine = applyLineOverwriteFallback(currentLine, newLineText)
+      if (fallbackLine !== currentLine) {
+        lines[line] = fallbackLine
         applied++
         continue
       }

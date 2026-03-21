@@ -11,6 +11,8 @@
   --bg: #F9F7F3;
   --bg-warm: #F0EDE6;
   --bg-hover: #EAE6DD;
+  --bg-surface: #FEFDFB;
+  --bg-surface-warm: #FCFBF9;
   --border: #DDD7CC;
   --border-light: #E8E3D9;
   --text: #2D2A26;
@@ -21,6 +23,7 @@
   --accent-light: rgba(196, 112, 75, 0.08);
   --accent-wash: rgba(196, 112, 75, 0.12);
   --danger: #B85450;
+  --danger-hover: #A34845;
   --danger-light: rgba(184, 84, 80, 0.08);
   --danger-wash: rgba(184, 84, 80, 0.12);
   --success: #5B8A5E;
@@ -31,10 +34,23 @@
   --shadow-lg: 0 8px 30px rgba(45, 42, 38, 0.12), 0 2px 8px rgba(45, 42, 38, 0.06);
   --font-display: 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --font-ui: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --transition: 180ms ease-out;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  --transition: 180ms cubic-bezier(0.25, 0, 0, 1);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
 
 body {
   font-family: var(--font-ui);
@@ -84,7 +100,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-size: 12.5px;
-  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   outline: none;
   transition: border-color var(--transition), box-shadow var(--transition);
 }
@@ -127,7 +143,7 @@ body {
 .preview-area {
   flex: 1;
   position: relative;
-  background: #fff;
+  background: var(--bg-surface);
   display: flex;
   min-width: 0;
 }
@@ -136,7 +152,7 @@ body {
   width: 50%;
   min-width: 320px;
   border-right: 1px solid var(--border);
-  background: #fff;
+  background: var(--bg-surface);
   display: none;
   flex-direction: column;
 }
@@ -151,7 +167,7 @@ body {
   justify-content: space-between;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border-light);
-  background: #fcfbf9;
+  background: var(--bg-surface-warm);
 }
 
 .source-title {
@@ -172,7 +188,7 @@ body {
   padding: 4px 9px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--bg-surface);
   color: var(--text-secondary);
   cursor: pointer;
   font-size: 12px;
@@ -203,8 +219,8 @@ body {
   padding: 12px 14px;
   font-size: 13px;
   line-height: 1.55;
-  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
-  color: #2b2f36;
+  font-family: var(--font-mono);
+  color: var(--text);
 }
 
 .source-status {
@@ -212,7 +228,7 @@ body {
   border-top: 1px solid var(--border-light);
   font-size: 11px;
   color: var(--text-tertiary);
-  background: #fcfbf9;
+  background: var(--bg-surface-warm);
 }
 
 .preview-pane {
@@ -258,7 +274,6 @@ body {
 .ann-count {
   font-size: 12px;
   font-weight: 500;
-  color: var(--text-tertiary);
   min-width: 18px;
   text-align: center;
   padding: 1px 6px;
@@ -446,7 +461,7 @@ body {
   font-size: 13px;
   font-weight: 500;
   font-family: var(--font-ui);
-  color: #F9F7F3;
+  color: var(--bg);
   background: transparent;
   transition: background var(--transition);
   white-space: nowrap;
@@ -552,7 +567,7 @@ body {
   font-weight: 500;
   font-family: var(--font-ui);
   background: var(--accent);
-  color: #fff;
+  color: var(--bg);
   transition: background var(--transition);
 }
 
@@ -734,22 +749,106 @@ body {
   font-weight: 500;
   font-family: var(--font-ui);
   background: var(--danger);
-  color: #fff;
+  color: var(--bg);
   transition: background var(--transition);
 }
 
-.confirm-actions .btn-danger:hover { background: #a34845; }
+.confirm-actions .btn-danger:hover { background: var(--danger-hover); }
+
+/* ── Focus-visible (C4) ── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.topbar input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.source-editor:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent-light);
+}
+
+.note-popover textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.ann-toolbar button:focus-visible {
+  outline: 2px solid var(--bg);
+  outline-offset: -2px;
+}
+
+/* ── Reduced motion (a11y) ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Responsive (adapt) ── */
+@media (max-width: 768px) {
+  .main {
+    flex-direction: column;
+  }
+
+  .side-panel {
+    width: 100%;
+    min-width: 0;
+    max-height: 40vh;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  .source-pane {
+    min-width: 0;
+  }
+
+  .note-popover {
+    width: calc(100vw - 32px);
+    max-width: 420px;
+  }
+
+  .confirm-dialog {
+    width: calc(100vw - 32px);
+    max-width: 340px;
+  }
+
+  .topbar-brand span { display: none; }
+}
+
+@media (max-width: 480px) {
+  .topbar { padding: 8px 10px; gap: 6px; }
+  .topbar-brand { margin-right: 0; }
+}
+
+/* ── Touch targets (adapt) ── */
+@media (pointer: coarse) {
+  .btn-ghost { min-height: 44px; padding: 10px 14px; }
+  .source-btn { min-height: 44px; padding: 10px 12px; }
+  .btn-panel { min-height: 44px; padding: 10px 12px; }
+  .ann-item .remove-btn { width: 44px; height: 44px; top: 2px; right: 2px; opacity: 1; }
+  .ann-toolbar button { min-height: 44px; padding: 10px 16px; }
+}
 </style>
 </head>
 <body>
 
 <div class="topbar">
   <div class="topbar-brand">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
     <span>Annotator</span>
   </div>
-  <input type="text" id="urlInput" spellcheck="false" placeholder="Preview URL">
-  <span class="edit-counter" id="editCounter"></span>
+  <label for="urlInput" class="sr-only">Preview URL</label>
+  <input type="text" id="urlInput" spellcheck="false" placeholder="Preview URL" aria-label="Preview URL">
+  <span class="edit-counter" id="editCounter" aria-live="polite"></span>
   <div class="topbar-actions">
     <button class="btn-ghost" id="toggleSourceBtn" title="Toggle source editor">Edit Source</button>
     <button class="btn-ghost" id="reloadBtn">Reload</button>
@@ -766,11 +865,11 @@ body {
           <button class="source-btn save" id="saveSourceBtn">Save</button>
         </div>
       </div>
-      <textarea id="sourceEditor" class="source-editor" spellcheck="false" placeholder="Loading source..."></textarea>
+      <textarea id="sourceEditor" class="source-editor" spellcheck="false" placeholder="Loading source..." aria-label="Markdown source editor"></textarea>
       <div class="source-status" id="sourceStatus">Source not loaded</div>
     </div>
     <div class="preview-pane">
-      <iframe id="previewFrame"></iframe>
+      <iframe id="previewFrame" title="Markdown preview"></iframe>
     </div>
   </div>
 
@@ -787,7 +886,7 @@ body {
     </div>
     <div class="ann-list" id="annList">
       <div class="empty-state" id="emptyState">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
         <p>Select text in the preview, then press <kbd>M</kbd> to modify, <kbd>A</kbd> to add, or <kbd>D</kbd> to delete</p>
       </div>
     </div>
@@ -795,10 +894,10 @@ body {
 </div>
 
 <div class="note-popover-overlay" id="noteOverlay"></div>
-<div class="note-popover" id="notePopover">
+<div class="note-popover" id="notePopover" role="dialog" aria-modal="true" aria-labelledby="notePopoverLabel">
   <div class="note-popover-label" id="notePopoverLabel">New annotation</div>
   <div class="note-popover-selected" id="notePopoverSelected"></div>
-  <textarea id="notePopoverInput" rows="3" placeholder="Add a note (optional)"></textarea>
+  <textarea id="notePopoverInput" rows="3" placeholder="Add a note (optional)" aria-label="Annotation note"></textarea>
   <div class="note-popover-actions">
     <button class="btn-cancel" id="notePopoverCancel">Cancel</button>
     <button class="btn-save" id="notePopoverSave">Save</button>
@@ -807,22 +906,22 @@ body {
 
 <div class="ann-toolbar" id="annToolbar">
   <button data-action="modify">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
     Modify <span class="kbd-hint">M</span>
   </button>
-  <div class="divider"></div>
+  <div class="divider" role="separator"></div>
   <button data-action="add">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     Add <span class="kbd-hint">A</span>
   </button>
-  <div class="divider"></div>
+  <div class="divider" role="separator"></div>
   <button data-action="delete">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
     Delete <span class="kbd-hint">D</span>
   </button>
 </div>
 
-<div class="confirm-overlay" id="confirmOverlay">
+<div class="confirm-overlay" id="confirmOverlay" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
   <div class="confirm-dialog">
     <h4 id="confirmTitle">Clear all annotations?</h4>
     <p id="confirmMessage">This will remove all annotations and highlights from this document. This cannot be undone.</p>
@@ -833,7 +932,7 @@ body {
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 (function() {
@@ -1280,7 +1379,10 @@ body {
         changes.forEach(function(c) {
           textSnapshot.set(c.el, c.el.textContent);
           c.el.style.animation = 'none';
-          c.el.offsetHeight; // force reflow
+        });
+        // Single forced reflow in iframe context, then apply animations
+        if (changes.length > 0) void changes[0].el.offsetHeight;
+        changes.forEach(function(c) {
           c.el.style.animation = 'saveFlash 0.6s ease-out';
         });
 
@@ -1420,7 +1522,7 @@ body {
     positionPopover(x, y);
     noteOverlay.classList.add('visible');
     notePopover.classList.add('visible');
-    setTimeout(() => notePopoverInput.focus(), 50);
+    releasePopoverTrap = trapFocus(notePopover);
   }
 
   function openPopoverForEdit(idx, anchorEl) {
@@ -1438,12 +1540,16 @@ body {
     positionPopover(rect.left, rect.bottom + 6);
     noteOverlay.classList.add('visible');
     notePopover.classList.add('visible');
-    setTimeout(() => { notePopoverInput.focus(); notePopoverInput.select(); }, 50);
+    releasePopoverTrap = trapFocus(notePopover);
+    setTimeout(() => { notePopoverInput.select(); }, 50);
   }
+
+  var releasePopoverTrap = null;
 
   function closePopover() {
     noteOverlay.classList.remove('visible');
     notePopover.classList.remove('visible');
+    if (releasePopoverTrap) { releasePopoverTrap(); releasePopoverTrap = null; }
     editingAnnotationIdx = -1;
     currentSelection = null;
   }
@@ -1577,7 +1683,7 @@ body {
         : `<div class="add-note-hint">Click to add a note</div>`;
 
       item.innerHTML = `
-        <button class="remove-btn" data-idx="${idx}" title="Remove">&times;</button>
+        <button class="remove-btn" data-idx="${idx}" title="Remove" aria-label="Remove annotation">&times;</button>
         <span class="type-badge ${badgeClass}">${badgeLabel}</span>
         <div class="snippet">${escapeHtml(truncText)}</div>
         ${noteHtml}
@@ -1682,14 +1788,40 @@ body {
   const confirmCancel = document.getElementById('confirmCancel');
   const confirmOk = document.getElementById('confirmOk');
 
+  function trapFocus(container) {
+    var focusable = container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    var first = focusable[0];
+    var last = focusable[focusable.length - 1];
+    function handler(e) {
+      if (e.key !== 'Tab') return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    }
+    container.addEventListener('keydown', handler);
+    first && first.focus();
+    return function() { container.removeEventListener('keydown', handler); };
+  }
+
+  var releaseFocusTrap = null;
+
   function showConfirm(onConfirm) {
     confirmOverlay.classList.add('visible');
-    var cleanup = () => { confirmOverlay.classList.remove('visible'); };
+    releaseFocusTrap = trapFocus(confirmOverlay.querySelector('.confirm-dialog'));
+    function onKey(e) { if (e.key === 'Escape') cleanup(); }
+    function onClickOutside(e) { if (e.target === confirmOverlay) cleanup(); }
+    var cleanup = () => {
+      confirmOverlay.classList.remove('visible');
+      confirmOverlay.removeEventListener('keydown', onKey);
+      confirmOverlay.removeEventListener('click', onClickOutside);
+      if (releaseFocusTrap) { releaseFocusTrap(); releaseFocusTrap = null; }
+    };
     confirmOk.onclick = () => { cleanup(); onConfirm(); };
     confirmCancel.onclick = cleanup;
-    confirmOverlay.addEventListener('click', (e) => {
-      if (e.target === confirmOverlay) cleanup();
-    }, { once: true });
+    confirmOverlay.addEventListener('keydown', onKey);
+    confirmOverlay.addEventListener('click', onClickOutside);
   }
 
   clearAllBtn.addEventListener('click', () => {

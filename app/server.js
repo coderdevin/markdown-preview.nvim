@@ -4,6 +4,7 @@ exports.run = function () {
   const http = require('http')
   const websocket = require('socket.io')
 
+  const fs = require('fs')
   const opener = require('./lib/util/opener')
   const logger = require('./lib/util/logger')('app/server')
   const { getIP } = require('./lib/util/getIP')
@@ -96,24 +97,29 @@ exports.run = function () {
         const buffer = buffers.find(b => b.id === targetBufnr)
         if (!buffer) return
 
+        const filePath = await buffer.name
+        if (!filePath || !fs.existsSync(filePath)) {
+          logger.error('update_lines: file not found: ', filePath)
+          return
+        }
+
+        let content = fs.readFileSync(filePath, 'utf-8')
+        let applied = 0
         for (const change of changes) {
-          // Search up to 10 lines from the source-line start for the changed text
-          const searchEnd = Math.min(change.line + 10, await buffer.length)
-          const lines = await buffer.getLines({ start: change.line, end: searchEnd })
-          let found = false
-          for (let i = 0; i < lines.length; i++) {
-            if (lines[i].includes(change.oldText)) {
-              const newLine = lines[i].replace(change.oldText, change.newText)
-              await buffer.setLines([newLine], { start: change.line + i, end: change.line + i + 1 })
-              found = true
-              break
-            }
-          }
-          if (!found) {
-            logger.error('update_lines: text not found in source: ', JSON.stringify(change.oldText).slice(0, 50))
+          if (change.oldText && content.includes(change.oldText)) {
+            content = content.replace(change.oldText, change.newText)
+            applied++
+          } else {
+            logger.error('update_lines: text not found: ', JSON.stringify(change.oldText).slice(0, 50))
           }
         }
-        logger.info('inline edit: ', changes.length, 'changes applied')
+
+        if (applied > 0) {
+          fs.writeFileSync(filePath, content, 'utf-8')
+          // Tell Vim to reload the file from disk
+          plugin.nvim.command('checktime')
+          logger.info('inline edit: ', applied, 'changes written to', filePath)
+        }
       } catch (e) {
         logger.error('update_lines error: ', e)
       }

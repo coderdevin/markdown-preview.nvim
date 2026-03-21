@@ -1405,7 +1405,7 @@ body {
     editingAnnotationIdx = idx;
     var t = ann.type || TYPE_MODIFY;
     notePopoverLabel.textContent = 'Edit note';
-    notePopoverInput.placeholder = t === TYPE_ADD ? 'What to add after this text?' : t === TYPE_DELETE ? 'Reason for deletion' : 'What should be changed?';
+    notePopoverInput.placeholder = t === TYPE_ADD ? 'What to add here?' : t === TYPE_DELETE ? 'Reason for deletion' : 'What should be changed?';
     const truncated = ann.text.length > 120 ? ann.text.substring(0, 120) + '...' : ann.text;
     notePopoverSelected.textContent = truncated;
     notePopoverSelected.style.display = '';
@@ -1470,7 +1470,7 @@ body {
     hideToolbar();
     popoverPosition = lastSelectionPos;
     notePopoverLabel.textContent = 'Add content';
-    notePopoverInput.placeholder = 'What to add after this text?';
+    notePopoverInput.placeholder = 'What to add here?';
     openPopoverForNew(lastSelectionPos.x, lastSelectionPos.y);
   }
 
@@ -1625,7 +1625,7 @@ body {
         if (ann.note) md += `\n**Reason:** ${ann.note}\n`;
       } else if (ann.type === TYPE_ADD) {
         md += `> ${text}\n`;
-        if (ann.note) md += `\n**Insert after:** ${ann.note}\n`;
+        if (ann.note) md += `\n**Add:** ${ann.note}\n`;
       } else {
         md += `> ${text}\n`;
         if (ann.note) md += `\n**Change to:** ${ann.note}\n`;
@@ -1635,7 +1635,7 @@ body {
     md += `---\n\n`;
     md += `Apply all annotations above to the original document:\n`;
     md += `- [MODIFY]: rewrite the quoted text according to the "Change to" instruction\n`;
-    md += `- [ADD]: write the new content according to the "Insert after" instruction\n`;
+    md += `- [ADD]: write the new content according to the "Add" instruction\n`;
     md += `- [DELETE]: remove the quoted text\n`;
     md += `\nOutput the complete revised document in full. Do not summarize or skip sections.\n`;
 

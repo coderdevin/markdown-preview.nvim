@@ -320,7 +320,7 @@ nmap <leader>a <Plug>MarkdownAnnotate
 
 ### 2. [ADD]
 > anchor text
-**Insert after:** content to add
+**Add:** content to add
 
 ### 3. [DELETE]
 > ~~text to remove~~
@@ -330,7 +330,7 @@ nmap <leader>a <Plug>MarkdownAnnotate
 
 Apply all annotations above to the original document:
 - [MODIFY]: rewrite the quoted text according to the "Change to" instruction
-- [ADD]: write the new content according to the "Insert after" instruction
+- [ADD]: write the new content according to the "Add" instruction
 - [DELETE]: remove the quoted text
 
 Output the complete revised document in full. Do not summarize or skip sections.

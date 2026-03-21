@@ -751,7 +751,7 @@ body {
   <input type="text" id="urlInput" spellcheck="false" placeholder="Preview URL">
   <span class="edit-counter" id="editCounter"></span>
   <div class="topbar-actions">
-    <button class="btn-ghost" id="toggleSourceBtn" title="Toggle source editor">Source</button>
+    <button class="btn-ghost" id="toggleSourceBtn" title="Toggle source editor">Edit Source</button>
     <button class="btn-ghost" id="reloadBtn">Reload</button>
   </div>
 </div>
@@ -870,8 +870,11 @@ body {
   const sourcePane = document.querySelector('.source-pane');
 
   toggleSourceBtn.addEventListener('click', function() {
-    sourcePane.classList.toggle('visible');
+    var isNowVisible = sourcePane.classList.toggle('visible');
     toggleSourceBtn.classList.toggle('active');
+    if (isNowVisible && !sourceContentSnapshot) {
+      loadSourceFromServer();
+    }
   });
   const noteOverlay = document.getElementById('noteOverlay');
   const notePopover = document.getElementById('notePopover');
@@ -989,12 +992,20 @@ body {
     });
   }
 
+  var sourceLoadRetries = 0;
   async function loadSourceFromServer() {
     if (!bufnr) return;
     if (!getPreviewSocket()) {
-      setSourceStatus('Waiting for preview connection...');
+      if (sourceLoadRetries < 5) {
+        sourceLoadRetries++;
+        setSourceStatus('Waiting for preview connection...');
+        setTimeout(loadSourceFromServer, 1000);
+      } else {
+        setSourceStatus('Could not connect to preview');
+      }
       return;
     }
+    sourceLoadRetries = 0;
     try {
       setSourceStatus('Loading source...');
       const result = await socketRequest('read_source', { bufnr: bufnr });
@@ -1327,10 +1338,7 @@ body {
     setupIframeListeners();
     loadAnnotations();
     renderList();
-    setTimeout(() => {
-      setupIframeListeners();
-      if (!sourceContentSnapshot) loadSourceFromServer();
-    }, 500);
+    setTimeout(setupIframeListeners, 500);
     setTimeout(observeIframeChanges, 1000);
   });
 

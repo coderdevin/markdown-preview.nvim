@@ -327,7 +327,13 @@ nmap <leader>a <Plug>MarkdownAnnotate
 **Reason:** why it should be removed
 
 ---
-Please review these annotations and suggest improvements to the document.
+
+Apply all annotations above to the original document:
+- [MODIFY]: rewrite the quoted text according to the "Change to" instruction
+- [ADD]: insert the new content after the quoted anchor text
+- [DELETE]: remove the quoted text
+
+Output the complete revised document in full. Do not summarize or skip sections.
 ```
 
 ### Custom Examples

@@ -1350,7 +1350,6 @@ body {
     catch(e) { title = urlInput.value.trim(); }
 
     let md = `# Document Review: ${title}\n\n`;
-    md += `Below are annotations on this document. Each annotation includes the original text and a reviewer note.\n\n`;
     md += `## Annotations\n\n`;
     annotations.forEach((ann, i) => {
       const annType = (ann.type || TYPE_MODIFY).toUpperCase();
@@ -1368,7 +1367,12 @@ body {
       }
       md += `\n`;
     });
-    md += `---\nPlease review these annotations and suggest improvements to the document.\n`;
+    md += `---\n\n`;
+    md += `Apply all annotations above to the original document:\n`;
+    md += `- [MODIFY]: rewrite the quoted text according to the "Change to" instruction\n`;
+    md += `- [ADD]: insert the new content after the quoted anchor text\n`;
+    md += `- [DELETE]: remove the quoted text\n`;
+    md += `\nOutput the complete revised document in full. Do not summarize or skip sections.\n`;
 
     navigator.clipboard.writeText(md).then(() => {
       showToast('Copied to clipboard');

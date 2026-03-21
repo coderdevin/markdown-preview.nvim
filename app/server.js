@@ -213,7 +213,7 @@ exports.run = function () {
         const resolvedFilePath = resolveBufferPath(filePath, nvimCwd)
         await fs.promises.writeFile(resolvedFilePath, content, 'utf-8')
         await plugin.nvim.command('checktime')
-        logger.info('source write: bytes=', Buffer.byteLength(content, 'utf8'), 'path=', resolvedFilePath)
+        logger.info('source write: chars=', content.length, 'path=', resolvedFilePath)
         reply({
           ok: true,
           filePath: resolvedFilePath

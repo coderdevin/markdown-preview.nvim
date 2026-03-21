@@ -977,17 +977,24 @@ body {
         return;
       }
 
+      var settled = false;
+      function settle(fn, value) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        fn(value);
+      }
+
       var timeout = setTimeout(() => {
-        reject(new Error(event + ' timeout'));
-      }, 5000);
+        settle(reject, new Error(event + ' timeout'));
+      }, 20000);
 
       sock.emit(event, payload, function(result) {
-        clearTimeout(timeout);
         if (!result || !result.ok) {
-          reject(new Error(result && result.error ? result.error : event + ' failed'));
+          settle(reject, new Error(result && result.error ? result.error : event + ' failed'));
           return;
         }
-        resolve(result);
+        settle(resolve, result);
       });
     });
   }
@@ -1036,6 +1043,23 @@ body {
         showToast('Source saved');
       }
     } catch (e) {
+      const message = String((e && e.message) || e || '');
+      if (message.includes('timeout')) {
+        try {
+          const verify = await socketRequest('read_source', { bufnr: bufnr });
+          const verifyContent = typeof verify.content === 'string' ? verify.content : '';
+          if (verifyContent === sourceEditor.value) {
+            sourceContentSnapshot = sourceEditor.value;
+            const now = new Date();
+            setSourceStatus('Saved at ' + now.toLocaleTimeString() + ' · delayed ack');
+            if (!silent) {
+              showToast('Source saved');
+            }
+            return;
+          }
+        } catch (_) {}
+      }
+
       setSourceStatus('Save failed');
       showToast('Source save failed');
     } finally {

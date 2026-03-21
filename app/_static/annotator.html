@@ -118,8 +118,103 @@ body {
 /* ── Main layout ── */
 .main { display: flex; flex: 1; overflow: hidden; }
 
-.preview-area { flex: 1; position: relative; background: #fff; }
-.preview-area iframe { width: 100%; height: 100%; border: none; }
+.preview-area {
+  flex: 1;
+  position: relative;
+  background: #fff;
+  display: flex;
+  min-width: 0;
+}
+
+.source-pane {
+  width: 45%;
+  min-width: 320px;
+  border-right: 1px solid var(--border);
+  background: #fff;
+  display: none;
+  flex-direction: column;
+}
+
+.source-pane.visible {
+  display: flex;
+}
+
+.source-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-light);
+  background: #fcfbf9;
+}
+
+.source-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.source-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.source-btn {
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  transition: all var(--transition);
+}
+
+.source-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.source-btn.save {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.source-btn.save:hover {
+  background: var(--accent-light);
+}
+
+.source-editor {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  outline: none;
+  resize: none;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  color: #2b2f36;
+}
+
+.source-status {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-light);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: #fcfbf9;
+}
+
+.preview-pane {
+  flex: 1;
+  min-width: 0;
+}
+
+.preview-pane iframe { width: 100%; height: 100%; border: none; }
 
 /* ── Side panel ── */
 .side-panel {
@@ -650,13 +745,27 @@ body {
   <input type="text" id="urlInput" spellcheck="false" placeholder="Preview URL">
   <span class="edit-counter" id="editCounter"></span>
   <div class="topbar-actions">
+    <button class="btn-ghost" id="toggleSourceBtn" title="Toggle source editor">Source</button>
     <button class="btn-ghost" id="reloadBtn">Reload</button>
   </div>
 </div>
 
 <div class="main">
   <div class="preview-area">
-    <iframe id="previewFrame"></iframe>
+    <div class="source-pane">
+      <div class="source-header">
+        <span class="source-title">Markdown Source</span>
+        <div class="source-actions">
+          <button class="source-btn" id="reloadSourceBtn">Reload</button>
+          <button class="source-btn save" id="saveSourceBtn">Save</button>
+        </div>
+      </div>
+      <textarea id="sourceEditor" class="source-editor" spellcheck="false" placeholder="Loading source..."></textarea>
+      <div class="source-status" id="sourceStatus">Source not loaded</div>
+    </div>
+    <div class="preview-pane">
+      <iframe id="previewFrame"></iframe>
+    </div>
   </div>
 
   <div class="side-panel">
@@ -747,6 +856,18 @@ body {
   const clearAllBtn = document.getElementById('clearAllBtn');
   const annCount = document.getElementById('annCount');
   const editCounterEl = document.getElementById('editCounter');
+  const sourceEditor = document.getElementById('sourceEditor');
+  const sourceStatusEl = document.getElementById('sourceStatus');
+  const saveSourceBtn = document.getElementById('saveSourceBtn');
+  const reloadSourceBtn = document.getElementById('reloadSourceBtn');
+  const toggleSourceBtn = document.getElementById('toggleSourceBtn');
+  const sourcePane = document.querySelector('.source-pane');
+
+  toggleSourceBtn.addEventListener('click', function() {
+    var isVisible = sourcePane.classList.toggle('visible');
+    toggleSourceBtn.style.background = isVisible ? 'var(--accent-light)' : '';
+    toggleSourceBtn.style.color = isVisible ? 'var(--accent)' : '';
+  });
   const noteOverlay = document.getElementById('noteOverlay');
   const notePopover = document.getElementById('notePopover');
   const notePopoverLabel = document.getElementById('notePopoverLabel');
@@ -760,6 +881,9 @@ body {
   let currentSelection = null;
   let highlightCounter = 0;
   let toastTimer = null;
+  let sourceContentSnapshot = '';
+  let sourceAutoSaveTimer = null;
+  let sourceSaving = false;
 
   // --- Init from query params ---
   const params = new URLSearchParams(window.location.search);
@@ -828,6 +952,107 @@ body {
   }
   reloadBtn.addEventListener('click', reloadIframe);
   urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') reloadIframe(); });
+
+  function setSourceStatus(msg) {
+    sourceStatusEl.textContent = msg;
+  }
+
+  function getPreviewSocket() {
+    return frame.contentWindow && frame.contentWindow.socket;
+  }
+
+  function socketRequest(event, payload) {
+    return new Promise((resolve, reject) => {
+      var sock = getPreviewSocket();
+      if (!sock) {
+        reject(new Error('preview socket not ready'));
+        return;
+      }
+
+      var timeout = setTimeout(() => {
+        reject(new Error(event + ' timeout'));
+      }, 5000);
+
+      sock.emit(event, payload, function(result) {
+        clearTimeout(timeout);
+        if (!result || !result.ok) {
+          reject(new Error(result && result.error ? result.error : event + ' failed'));
+          return;
+        }
+        resolve(result);
+      });
+    });
+  }
+
+  async function loadSourceFromServer() {
+    if (!bufnr) return;
+    if (!getPreviewSocket()) {
+      setSourceStatus('Waiting for preview connection...');
+      return;
+    }
+    try {
+      setSourceStatus('Loading source...');
+      const result = await socketRequest('read_source', { bufnr: bufnr });
+      const content = typeof result.content === 'string' ? result.content : '';
+      sourceEditor.value = content;
+      sourceContentSnapshot = content;
+      setSourceStatus('Loaded from ' + (result.filePath || 'buffer'));
+    } catch (e) {
+      setSourceStatus('Load failed');
+      showToast('Source load failed');
+    }
+  }
+
+  async function saveSourceToServer(silent) {
+    if (!bufnr || sourceSaving) return;
+    if (sourceEditor.value === sourceContentSnapshot) return;
+    sourceSaving = true;
+    try {
+      setSourceStatus('Saving...');
+      const result = await socketRequest('write_source', {
+        bufnr: bufnr,
+        content: sourceEditor.value
+      });
+      sourceContentSnapshot = sourceEditor.value;
+      const now = new Date();
+      setSourceStatus('Saved at ' + now.toLocaleTimeString() + ' · ' + (result.filePath || 'buffer'));
+      if (!silent) {
+        showToast('Source saved');
+      }
+    } catch (e) {
+      setSourceStatus('Save failed');
+      showToast('Source save failed');
+    } finally {
+      sourceSaving = false;
+    }
+  }
+
+  reloadSourceBtn.addEventListener('click', function() {
+    loadSourceFromServer();
+  });
+
+  saveSourceBtn.addEventListener('click', function() {
+    saveSourceToServer(false);
+  });
+
+  sourceEditor.addEventListener('keydown', function(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      saveSourceToServer(false);
+    }
+  });
+
+  sourceEditor.addEventListener('input', function() {
+    if (sourceEditor.value === sourceContentSnapshot) {
+      setSourceStatus('No unsaved changes');
+      return;
+    }
+    setSourceStatus('Unsaved changes...');
+    clearTimeout(sourceAutoSaveTimer);
+    sourceAutoSaveTimer = setTimeout(function() {
+      saveSourceToServer(true);
+    }, 900);
+  });
 
   // --- Inject highlight CSS into iframe ---
   function injectStyles() {
@@ -1099,8 +1324,9 @@ body {
     renderList();
     setTimeout(() => {
       setupIframeListeners();
-      try { setupInlineEditing(frame.contentDocument); } catch(e) {}
+      loadSourceFromServer();
     }, 500);
+    setTimeout(loadSourceFromServer, 1200);
     setTimeout(observeIframeChanges, 1000);
   });
 

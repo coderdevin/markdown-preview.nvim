@@ -100,7 +100,7 @@ exports.run = function () {
           const lines = await buffer.getLines({ start: change.line, end: change.line + 1 })
           if (lines[0] && lines[0].includes(change.oldText)) {
             const newLine = lines[0].replace(change.oldText, change.newText)
-            await buffer.setLines(newLine, { start: change.line, end: change.line + 1 })
+            await buffer.setLines([newLine], { start: change.line, end: change.line + 1 })
           }
         }
         logger.info('inline edit: ', changes.length, 'changes applied')

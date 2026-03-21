@@ -712,10 +712,13 @@ body {
   }
 
   // --- URL handling ---
+  function reloadIframe() {
+    var src = bufnr ? '/page/' + bufnr : urlInput.value.trim();
+    frame.src = '';
+    setTimeout(() => { frame.src = src; }, 0);
+  }
   loadBtn.addEventListener('click', () => { frame.src = urlInput.value.trim(); });
-  reloadBtn.addEventListener('click', () => {
-    try { frame.contentWindow.location.reload(); } catch(e) { frame.src = urlInput.value.trim(); }
-  });
+  reloadBtn.addEventListener('click', reloadIframe);
   urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadBtn.click(); });
 
   // --- Inject highlight CSS into iframe ---

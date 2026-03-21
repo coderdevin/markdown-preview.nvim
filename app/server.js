@@ -98,12 +98,9 @@ exports.run = function () {
         if (!buffer) return
 
         const filePath = await buffer.name
-        if (!filePath || !fs.existsSync(filePath)) {
-          logger.error('update_lines: file not found: ', filePath)
-          return
-        }
+        if (!filePath) return
 
-        let content = fs.readFileSync(filePath, 'utf-8')
+        let content = await fs.promises.readFile(filePath, 'utf-8')
         let applied = 0
         for (const change of changes) {
           if (change.oldText && content.includes(change.oldText)) {
@@ -115,8 +112,7 @@ exports.run = function () {
         }
 
         if (applied > 0) {
-          fs.writeFileSync(filePath, content, 'utf-8')
-          // Tell Vim to reload the file from disk
+          await fs.promises.writeFile(filePath, content, 'utf-8')
           plugin.nvim.command('checktime')
           logger.info('inline edit: ', applied, 'changes written to', filePath)
         }

@@ -8,6 +8,7 @@ exports.run = function () {
   const opener = require('./lib/util/opener')
   const logger = require('./lib/util/logger')('app/server')
   const { applyInlineChangesToContent } = require('./lib/util/applyInlineChanges')
+  const { resolveBufferPath } = require('./lib/util/resolveBufferPath')
   const { getIP } = require('./lib/util/getIP')
   const routes = require('./routes')
 
@@ -108,7 +109,9 @@ exports.run = function () {
           return
         }
 
-        let content = await fs.promises.readFile(filePath, 'utf-8')
+        const nvimCwd = await plugin.nvim.call('getcwd')
+        const resolvedFilePath = resolveBufferPath(filePath, nvimCwd)
+        let content = await fs.promises.readFile(resolvedFilePath, 'utf-8')
         const result = applyInlineChangesToContent(content, changes)
 
         if (result.unapplied.length > 0) {
@@ -116,9 +119,9 @@ exports.run = function () {
         }
 
         if (result.applied > 0 && result.content !== content) {
-          await fs.promises.writeFile(filePath, result.content, 'utf-8')
+          await fs.promises.writeFile(resolvedFilePath, result.content, 'utf-8')
           await plugin.nvim.command('checktime')
-          logger.info('inline edit: ', result.applied, 'changes written to', filePath)
+          logger.info('inline edit: ', result.applied, 'changes written to', resolvedFilePath)
         }
 
         reply({ ok: true, applied: result.applied, unapplied: result.unapplied.length })

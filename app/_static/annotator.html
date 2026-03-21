@@ -4,57 +4,500 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Markdown Annotator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+:root {
+  --bg: #F9F7F3;
+  --bg-warm: #F0EDE6;
+  --bg-hover: #EAE6DD;
+  --border: #DDD7CC;
+  --border-light: #E8E3D9;
+  --text: #2D2A26;
+  --text-secondary: #6B6560;
+  --text-tertiary: #9B958C;
+  --accent: #C4704B;
+  --accent-hover: #B5613D;
+  --accent-light: rgba(196, 112, 75, 0.08);
+  --accent-wash: rgba(196, 112, 75, 0.12);
+  --danger: #B85450;
+  --danger-light: rgba(184, 84, 80, 0.08);
+  --success: #5B8A5E;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 1px 3px rgba(45, 42, 38, 0.06);
+  --shadow-md: 0 4px 12px rgba(45, 42, 38, 0.08), 0 1px 3px rgba(45, 42, 38, 0.06);
+  --shadow-lg: 0 8px 30px rgba(45, 42, 38, 0.12), 0 2px 8px rgba(45, 42, 38, 0.06);
+  --font-display: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-ui: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --transition: 180ms ease-out;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-.topbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #16213e; border-bottom: 1px solid #0f3460; flex-shrink: 0; }
-.topbar label { font-size: 13px; color: #a0a0c0; white-space: nowrap; }
-.topbar input[type="text"] { flex: 1; padding: 5px 10px; border: 1px solid #0f3460; border-radius: 4px; background: #1a1a2e; color: #e0e0e0; font-size: 13px; font-family: monospace; }
-.topbar button { padding: 5px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; background: #0f3460; color: #e0e0e0; transition: background 0.15s; }
-.topbar button:hover { background: #1a5276; }
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
 
+/* ── Top bar ── */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--bg-warm);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.topbar-brand svg { color: var(--accent); flex-shrink: 0; }
+
+.topbar-brand span {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.topbar input[type="text"] {
+  flex: 1;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.topbar input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.topbar-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+.btn-ghost {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text-secondary);
+  transition: all var(--transition);
+}
+
+.btn-ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+/* ── Main layout ── */
 .main { display: flex; flex: 1; overflow: hidden; }
 
 .preview-area { flex: 1; position: relative; background: #fff; }
 .preview-area iframe { width: 100%; height: 100%; border: none; }
 
-.ann-toolbar { position: fixed; display: none; z-index: 10000; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); gap: 4px; }
+/* ── Side panel ── */
+.side-panel {
+  width: 320px;
+  min-width: 320px;
+  background: var(--bg-warm);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.panel-header {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.panel-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.panel-title h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.ann-count {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  min-width: 18px;
+  text-align: center;
+  padding: 1px 6px;
+  background: var(--accent-light);
+  color: var(--accent);
+  border-radius: 99px;
+  display: none;
+}
+
+.ann-count.visible { display: inline-block; }
+
+.panel-actions { display: flex; gap: 4px; }
+
+.btn-panel {
+  padding: 5px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-ui);
+  transition: all var(--transition);
+  background: transparent;
+}
+
+.btn-panel.copy {
+  color: var(--text-secondary);
+}
+.btn-panel.copy:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.btn-panel.clear {
+  color: var(--text-tertiary);
+}
+.btn-panel.clear:hover {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+/* ── Annotation list ── */
+.ann-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  scroll-behavior: smooth;
+}
+
+.ann-list::-webkit-scrollbar { width: 5px; }
+.ann-list::-webkit-scrollbar-track { background: transparent; }
+.ann-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+.ann-list::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+/* ── Empty state ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 28px 40px;
+  text-align: center;
+}
+
+.empty-state svg {
+  color: var(--border);
+  margin-bottom: 20px;
+}
+
+.empty-state p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 220px;
+}
+
+.empty-state kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+/* ── Annotation items ── */
+.ann-item {
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  position: relative;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--transition);
+  animation: slideIn 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ann-item:hover {
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.ann-item .snippet {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.55;
+  word-break: break-word;
+  font-style: italic;
+}
+
+.ann-item .snippet::before { content: '\201C'; color: var(--accent); font-weight: 600; }
+.ann-item .snippet::after { content: '\201D'; color: var(--accent); font-weight: 600; }
+
+.ann-item .note {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+  line-height: 1.5;
+  word-break: break-word;
+  padding-left: 10px;
+  border-left: 2px solid var(--accent-wash);
+}
+
+.ann-item .remove-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 14px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all var(--transition);
+}
+
+.ann-item:hover .remove-btn { opacity: 1; }
+.ann-item .remove-btn:hover {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+/* ── Floating toolbar ── */
+.ann-toolbar {
+  position: fixed;
+  display: none;
+  z-index: 10000;
+  background: var(--text);
+  border-radius: 8px;
+  padding: 3px;
+  box-shadow: var(--shadow-lg);
+  gap: 2px;
+  animation: toolbarIn 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes toolbarIn {
+  from { opacity: 0; transform: translateY(4px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .ann-toolbar.visible { display: flex; }
-.ann-toolbar button { padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; color: #fff; background: #3498db; transition: opacity 0.15s; }
-.ann-toolbar button:hover { opacity: 0.85; }
 
-.side-panel { width: 300px; min-width: 300px; background: #16213e; border-left: 1px solid #0f3460; display: flex; flex-direction: column; flex-shrink: 0; }
-.panel-header { padding: 12px; border-bottom: 1px solid #0f3460; display: flex; justify-content: space-between; align-items: center; }
-.panel-header h3 { font-size: 14px; color: #a0a0c0; }
-.panel-actions { display: flex; gap: 6px; }
-.panel-actions button { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; transition: background 0.15s; }
-.btn-copy { background: #27ae60; color: #fff; }
-.btn-copy:hover { background: #2ecc71; }
-.btn-clear { background: #e74c3c; color: #fff; }
-.btn-clear:hover { background: #c0392b; }
+.ann-toolbar button {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-ui);
+  color: #F9F7F3;
+  background: transparent;
+  transition: background var(--transition);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 
-.ann-list { flex: 1; overflow-y: auto; padding: 8px; }
-.ann-list::-webkit-scrollbar { width: 6px; }
-.ann-list::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+.ann-toolbar button:hover { background: rgba(249, 247, 243, 0.12); }
 
-.ann-item { background: #1a1a2e; border-radius: 6px; padding: 10px; margin-bottom: 8px; position: relative; cursor: pointer; border-left: 3px solid #3498db; transition: background 0.15s; }
-.ann-item:hover { background: #1e2a4a; }
-.ann-item .snippet { font-size: 12px; color: #c0c0d0; margin: 4px 0; line-height: 1.4; word-break: break-word; }
-.ann-item .note { font-size: 12px; color: #80d0ff; font-style: italic; margin-top: 4px; word-break: break-word; }
-.ann-item .remove-btn { position: absolute; top: 6px; right: 8px; background: none; border: none; color: #666; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 4px; }
-.ann-item .remove-btn:hover { color: #e74c3c; }
+.ann-toolbar button svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
 
-.empty-state { text-align: center; padding: 40px 20px; color: #555; font-size: 13px; line-height: 1.6; }
+/* ── Inline note editor ── */
+.note-editor {
+  display: none;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+  animation: editorIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes editorIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.note-editor.visible { display: block; }
+
+.note-editor-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+
+.note-editor-selected {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-secondary);
+  padding: 8px 10px;
+  background: var(--accent-light);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  max-height: 52px;
+  overflow: hidden;
+  line-height: 1.5;
+}
+
+.note-editor textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-warm);
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  resize: none;
+  outline: none;
+  line-height: 1.5;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.note-editor textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.note-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.btn-save {
+  padding: 6px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-ui);
+  background: var(--accent);
+  color: #fff;
+  transition: background var(--transition);
+}
+
+.btn-save:hover { background: var(--accent-hover); }
+
+.btn-cancel {
+  padding: 6px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-ui);
+  background: transparent;
+  color: var(--text-secondary);
+  transition: all var(--transition);
+}
+
+.btn-cancel:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* Confirmation toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--text);
+  color: var(--bg);
+  padding: 10px 20px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 20000;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <label>Preview URL:</label>
-  <input type="text" id="urlInput" spellcheck="false">
-  <button id="loadBtn">Load</button>
-  <button id="reloadBtn">Reload</button>
+  <div class="topbar-brand">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    <span>Annotator</span>
+  </div>
+  <input type="text" id="urlInput" spellcheck="false" placeholder="Preview URL">
+  <div class="topbar-actions">
+    <button class="btn-ghost" id="loadBtn">Load</button>
+    <button class="btn-ghost" id="reloadBtn">Reload</button>
+  </div>
 </div>
 
 <div class="main">
@@ -64,42 +507,69 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
   <div class="side-panel">
     <div class="panel-header">
-      <h3>Annotations</h3>
+      <div class="panel-title">
+        <h3>Notes</h3>
+        <span class="ann-count" id="annCount">0</span>
+      </div>
       <div class="panel-actions">
-        <button class="btn-copy" id="copyAllBtn" title="Copy all as markdown">Copy All</button>
-        <button class="btn-clear" id="clearAllBtn" title="Remove all annotations">Clear All</button>
+        <button class="btn-panel copy" id="copyAllBtn">Copy All</button>
+        <button class="btn-panel clear" id="clearAllBtn">Clear</button>
       </div>
     </div>
     <div class="ann-list" id="annList">
-      <div class="empty-state">
-        Select text in the preview<br>to create annotations
+      <div class="empty-state" id="emptyState">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        <p>Select any text in the preview to highlight and annotate it</p>
+      </div>
+    </div>
+    <div class="note-editor" id="noteEditor">
+      <div class="note-editor-label">New annotation</div>
+      <div class="note-editor-selected" id="noteEditorSelected"></div>
+      <textarea id="noteEditorInput" rows="2" placeholder="Add a note (optional)"></textarea>
+      <div class="note-editor-actions">
+        <button class="btn-cancel" id="noteEditorCancel">Cancel</button>
+        <button class="btn-save" id="noteEditorSave">Save</button>
       </div>
     </div>
   </div>
 </div>
 
 <div class="ann-toolbar" id="annToolbar">
-  <button data-action="annotate">Annotate</button>
+  <button data-action="annotate">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    Annotate
+  </button>
 </div>
+
+<div class="toast" id="toast"></div>
 
 <script>
 (function() {
   'use strict';
 
-  var HIGHLIGHT_CSS = '.ann-highlight { background: rgba(52, 152, 219, 0.25) !important; border-bottom: 2px solid #3498db !important; cursor: pointer !important; }';
+  var HIGHLIGHT_CSS = '.ann-highlight { background: rgba(196, 112, 75, 0.14) !important; border-bottom: 2px solid rgba(196, 112, 75, 0.5) !important; cursor: pointer !important; transition: background 0.15s ease !important; } .ann-highlight:hover { background: rgba(196, 112, 75, 0.25) !important; }';
 
   const frame = document.getElementById('previewFrame');
   const toolbar = document.getElementById('annToolbar');
   const annList = document.getElementById('annList');
+  const emptyState = document.getElementById('emptyState');
   const urlInput = document.getElementById('urlInput');
   const loadBtn = document.getElementById('loadBtn');
   const reloadBtn = document.getElementById('reloadBtn');
   const copyAllBtn = document.getElementById('copyAllBtn');
   const clearAllBtn = document.getElementById('clearAllBtn');
+  const annCount = document.getElementById('annCount');
+  const noteEditor = document.getElementById('noteEditor');
+  const noteEditorSelected = document.getElementById('noteEditorSelected');
+  const noteEditorInput = document.getElementById('noteEditorInput');
+  const noteEditorCancel = document.getElementById('noteEditorCancel');
+  const noteEditorSave = document.getElementById('noteEditorSave');
+  const toastEl = document.getElementById('toast');
 
   let annotations = [];
   let currentSelection = null;
   let highlightCounter = 0;
+  let toastTimer = null;
 
   // --- Init from query params ---
   const params = new URLSearchParams(window.location.search);
@@ -111,6 +581,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   } else {
     frame.src = '/';
     urlInput.value = window.location.origin;
+  }
+
+  // --- Toast ---
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('visible');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('visible'), 2000);
   }
 
   // --- Storage ---
@@ -141,6 +619,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     } catch(e) { annotations = []; }
   }
 
+  function updateCount() {
+    annCount.textContent = annotations.length;
+    annCount.classList.toggle('visible', annotations.length > 0);
+  }
+
   // --- URL handling ---
   loadBtn.addEventListener('click', () => { frame.src = urlInput.value.trim(); });
   reloadBtn.addEventListener('click', () => {
@@ -160,7 +643,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     } catch(e) {}
   }
 
-  // --- Shared: wrap a range in a highlight mark ---
   function wrapRangeInMark(range, id) {
     const doc = frame.contentDocument;
     const mark = doc.createElement('mark');
@@ -169,7 +651,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     try {
       range.surroundContents(mark);
     } catch(e) {
-      // surroundContents fails when range spans multiple elements
       const frag = range.cloneContents();
       mark.appendChild(frag);
       range.deleteContents();
@@ -178,7 +659,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     return mark;
   }
 
-  // --- Shared: unwrap a highlight mark, restoring original DOM ---
   function unwrapMark(el) {
     const parent = el.parentNode;
     while (el.firstChild) parent.insertBefore(el.firstChild, el);
@@ -193,7 +673,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     } catch(e) { return null; }
   }
 
-  // --- Re-apply highlights after iframe content reload ---
   function reapplyHighlights() {
     try {
       const doc = frame.contentDocument;
@@ -217,9 +696,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         const range = doc.createRange();
         range.setStart(node, idx);
         range.setEnd(node, Math.min(idx + text.length, node.textContent.length));
-        try {
-          wrapRangeInMark(range, id);
-        } catch(e) {}
+        try { wrapRangeInMark(range, id); } catch(e) {}
         return true;
       }
     }
@@ -263,14 +740,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     }
   }
 
-  // Single consolidated load handler
   frame.addEventListener('load', () => {
     setupIframeListeners();
     loadAnnotations();
     renderList();
-    // Retry for cases where iframe DOM isn't fully ready at load time
     setTimeout(setupIframeListeners, 500);
-    // Set up MutationObserver for live content updates
     setTimeout(observeIframeChanges, 1000);
   });
 
@@ -278,9 +752,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   function showToolbar(e) {
     const iframeRect = frame.getBoundingClientRect();
     let x = iframeRect.left + e.clientX;
-    let y = iframeRect.top + e.clientY - 45;
+    let y = iframeRect.top + e.clientY - 50;
 
-    const tw = 120;
+    const tw = 130;
     if (x + tw > window.innerWidth) x = window.innerWidth - tw - 10;
     if (x < 10) x = 10;
     if (y < 10) y = iframeRect.top + e.clientY + 20;
@@ -296,14 +770,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
   toolbar.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
 
-  // --- Annotation action ---
-  toolbar.querySelector('button').addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  // --- Note editor ---
+  function openNoteEditor() {
     if (!currentSelection) return;
+    const truncated = currentSelection.text.length > 120
+      ? currentSelection.text.substring(0, 120) + '...'
+      : currentSelection.text;
+    noteEditorSelected.textContent = truncated;
+    noteEditorInput.value = '';
+    noteEditor.classList.add('visible');
+    setTimeout(() => noteEditorInput.focus(), 50);
+  }
 
-    const note = prompt('Add a note (optional):') || '';
+  function closeNoteEditor() {
+    noteEditor.classList.remove('visible');
+    currentSelection = null;
+  }
 
+  function commitAnnotation() {
+    if (!currentSelection) { closeNoteEditor(); return; }
+
+    const note = noteEditorInput.value.trim();
     const id = 'ann-' + (++highlightCounter);
     const ann = {
       id: id,
@@ -318,29 +805,50 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     annotations.push(ann);
     saveAnnotations();
     renderList();
+    closeNoteEditor();
+  }
+
+  toolbar.querySelector('button').addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     hideToolbar();
-    currentSelection = null;
+    openNoteEditor();
   });
 
-  // --- Render annotation list ---
+  noteEditorCancel.addEventListener('click', closeNoteEditor);
+  noteEditorSave.addEventListener('click', commitAnnotation);
+
+  noteEditorInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitAnnotation(); }
+    if (e.key === 'Escape') closeNoteEditor();
+  });
+
+  // --- Render ---
   function renderList() {
+    updateCount();
+
     if (annotations.length === 0) {
-      annList.innerHTML = '<div class="empty-state">Select text in the preview<br>to create annotations</div>';
+      annList.innerHTML = '';
+      annList.appendChild(emptyState);
+      emptyState.style.display = '';
       return;
     }
 
+    emptyState.style.display = 'none';
     annList.innerHTML = '';
+
     annotations.forEach((ann, idx) => {
       const item = document.createElement('div');
       item.className = 'ann-item';
       item.dataset.id = ann.id;
+      item.style.animationDelay = (idx * 30) + 'ms';
 
-      const truncText = ann.text.length > 80 ? ann.text.substring(0, 80) + '...' : ann.text;
+      const truncText = ann.text.length > 100 ? ann.text.substring(0, 100) + '...' : ann.text;
       const noteHtml = ann.note ? `<div class="note">${escapeHtml(ann.note)}</div>` : '';
 
       item.innerHTML = `
         <button class="remove-btn" data-idx="${idx}" title="Remove">&times;</button>
-        <div class="snippet">"${escapeHtml(truncText)}"</div>
+        <div class="snippet">${escapeHtml(truncText)}</div>
         ${noteHtml}
       `;
 
@@ -370,9 +878,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       const el = doc.querySelector(`[data-ann-id="${id}"]`);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        el.style.transition = 'outline 0.15s';
-        el.style.outline = '3px solid #fff';
-        setTimeout(() => { el.style.outline = 'none'; }, 1500);
+        el.style.transition = 'background 0.2s ease';
+        el.style.background = 'rgba(196, 112, 75, 0.35)';
+        setTimeout(() => { el.style.background = ''; }, 1500);
       }
     } catch(e) {}
   }
@@ -398,17 +906,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     try { title = frame.contentDocument.title || urlInput.value.trim(); }
     catch(e) { title = urlInput.value.trim(); }
 
-    let md = `## Annotations - ${title}\n\n`;
+    let md = `## Annotations \u2014 ${title}\n\n`;
     annotations.forEach(ann => {
       const text = ann.text.replace(/\n/g, ' ').substring(0, 200);
       md += ann.note
-        ? `- "${text}": ${ann.note}\n`
-        : `- "${text}"\n`;
+        ? `- \u201C${text}\u201D \u2014 ${ann.note}\n`
+        : `- \u201C${text}\u201D\n`;
     });
 
     navigator.clipboard.writeText(md).then(() => {
-      copyAllBtn.textContent = 'Copied!';
-      setTimeout(() => { copyAllBtn.textContent = 'Copy All'; }, 1500);
+      showToast('Copied to clipboard');
     }).catch(() => {
       const ta = document.createElement('textarea');
       ta.value = md;
@@ -416,15 +923,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       ta.select();
       document.execCommand('copy');
       document.body.removeChild(ta);
-      copyAllBtn.textContent = 'Copied!';
-      setTimeout(() => { copyAllBtn.textContent = 'Copy All'; }, 1500);
+      showToast('Copied to clipboard');
     });
   });
 
   // --- Clear All ---
   clearAllBtn.addEventListener('click', () => {
     if (annotations.length === 0) return;
-    if (!confirm('Clear all annotations?')) return;
+    if (!confirm('Remove all annotations?')) return;
 
     try {
       const doc = frame.contentDocument;
@@ -434,11 +940,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     annotations = [];
     localStorage.removeItem(storageKey());
     renderList();
+    showToast('All annotations cleared');
   });
 
   document.addEventListener('mousedown', () => { hideToolbar(); });
 
-  // --- Observe iframe DOM changes (markdown-preview hot-reloads content) ---
   function observeIframeChanges() {
     try {
       const doc = frame.contentDocument;

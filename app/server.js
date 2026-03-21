@@ -65,39 +65,63 @@ exports.run = function () {
     // update vim variable
     update_clients_active_var();
 
-    const buffers = await plugin.nvim.buffers
-    buffers.forEach(async (buffer) => {
-      if (buffer.id === Number(bufnr)) {
-        const winline = await plugin.nvim.call('winline')
-        const currentWindow = await plugin.nvim.window
-        const winheight = await plugin.nvim.call('winheight', currentWindow.id)
-        const cursor = await plugin.nvim.call('getpos', '.')
-        const options = await plugin.nvim.getVar('mkdp_preview_options')
-        const pageTitle = await plugin.nvim.getVar('mkdp_page_title')
-        const theme = await plugin.nvim.getVar('mkdp_theme')
-        const name = await buffer.name
-        const content = await buffer.getLines()
-        const currentBuffer = await plugin.nvim.buffer
-        client.emit('refresh_content', {
-          options,
-          isActive: currentBuffer.id === buffer.id,
-          winline,
-          winheight,
-          cursor,
-          pageTitle,
-          theme,
-          name,
-          content
+    const loadBufferById = async (targetBufnr) => {
+      const buffers = await plugin.nvim.buffers
+      return buffers.find(b => b.id === Number(targetBufnr))
+    }
+
+    const buildRefreshData = async (targetBufnr) => {
+      const buffer = await loadBufferById(targetBufnr)
+      if (!buffer) return null
+
+      const winline = await plugin.nvim.call('winline')
+      const currentWindow = await plugin.nvim.window
+      const winheight = await plugin.nvim.call('winheight', currentWindow.id)
+      const cursor = await plugin.nvim.call('getpos', '.')
+      const options = await plugin.nvim.getVar('mkdp_preview_options')
+      const pageTitle = await plugin.nvim.getVar('mkdp_page_title')
+      const theme = await plugin.nvim.getVar('mkdp_theme')
+      const name = await buffer.name
+      const content = await buffer.getLines()
+      const currentBuffer = await plugin.nvim.buffer
+      return {
+        options,
+        isActive: currentBuffer.id === buffer.id,
+        winline,
+        winheight,
+        cursor,
+        pageTitle,
+        theme,
+        name,
+        content
+      }
+    }
+
+    const emitRefreshContent = async (targetBufnr, targetClient) => {
+      const data = await buildRefreshData(targetBufnr)
+      if (!data) return false
+
+      if (targetClient) {
+        if (targetClient.connected) {
+          targetClient.emit('refresh_content', data)
+        }
+      } else {
+        ;(clients[targetBufnr] || []).forEach(c => {
+          if (c.connected) {
+            c.emit('refresh_content', data)
+          }
         })
       }
-    })
+      return true
+    }
+
+    await emitRefreshContent(Number(bufnr), client)
 
     client.on('update_lines', async ({ bufnr: updateBufnr, changes }, done) => {
       const reply = typeof done === 'function' ? done : function () {}
       try {
         const targetBufnr = Number(updateBufnr || bufnr)
-        const buffers = await plugin.nvim.buffers
-        const buffer = buffers.find(b => b.id === targetBufnr)
+        const buffer = await loadBufferById(targetBufnr)
         if (!buffer) {
           reply({ ok: false, applied: 0, error: 'buffer not found' })
           return
@@ -121,6 +145,7 @@ exports.run = function () {
         if (result.applied > 0 && result.content !== content) {
           await fs.promises.writeFile(resolvedFilePath, result.content, 'utf-8')
           await plugin.nvim.command('checktime')
+          await emitRefreshContent(targetBufnr)
           logger.info('inline edit: ', result.applied, 'changes written to', resolvedFilePath)
         }
 
@@ -131,9 +156,76 @@ exports.run = function () {
       }
     })
 
+    client.on('read_source', async ({ bufnr: updateBufnr }, done) => {
+      const reply = typeof done === 'function' ? done : function () {}
+      try {
+        const targetBufnr = Number(updateBufnr || bufnr)
+        const buffer = await loadBufferById(targetBufnr)
+        if (!buffer) {
+          reply({ ok: false, error: 'buffer not found' })
+          return
+        }
+
+        const filePath = await buffer.name
+        if (!filePath) {
+          reply({ ok: false, error: 'buffer has no file path' })
+          return
+        }
+
+        const nvimCwd = await plugin.nvim.call('getcwd')
+        const resolvedFilePath = resolveBufferPath(filePath, nvimCwd)
+        const content = await fs.promises.readFile(resolvedFilePath, 'utf-8')
+        reply({
+          ok: true,
+          content,
+          filePath: resolvedFilePath
+        })
+      } catch (e) {
+        logger.error('read_source error: ', e)
+        reply({ ok: false, error: String((e && e.message) || e) })
+      }
+    })
+
+    client.on('write_source', async ({ bufnr: updateBufnr, content }, done) => {
+      const reply = typeof done === 'function' ? done : function () {}
+      try {
+        const targetBufnr = Number(updateBufnr || bufnr)
+        const buffer = await loadBufferById(targetBufnr)
+        if (!buffer) {
+          reply({ ok: false, error: 'buffer not found' })
+          return
+        }
+
+        if (typeof content !== 'string') {
+          reply({ ok: false, error: 'content must be string' })
+          return
+        }
+
+        const filePath = await buffer.name
+        if (!filePath) {
+          reply({ ok: false, error: 'buffer has no file path' })
+          return
+        }
+
+        const nvimCwd = await plugin.nvim.call('getcwd')
+        const resolvedFilePath = resolveBufferPath(filePath, nvimCwd)
+        await fs.promises.writeFile(resolvedFilePath, content, 'utf-8')
+        await plugin.nvim.command('checktime')
+        await emitRefreshContent(targetBufnr)
+        logger.info('source write: bytes=', Buffer.byteLength(content, 'utf8'), 'path=', resolvedFilePath)
+        reply({
+          ok: true,
+          filePath: resolvedFilePath
+        })
+      } catch (e) {
+        logger.error('write_source error: ', e)
+        reply({ ok: false, error: String((e && e.message) || e) })
+      }
+    })
+
     client.on('disconnect', function () {
       logger.info('disconnect: ', client.id)
-      clients[bufnr] = (clients[bufnr] || []).map(c => c.id !== client.id)
+      clients[bufnr] = (clients[bufnr] || []).filter(c => c.id !== client.id)
       // update vim variable
       update_clients_active_var();
     })

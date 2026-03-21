@@ -489,7 +489,10 @@ body {
 .ann-item:hover .add-note-hint { opacity: 1; }
 .ann-item .add-note-hint:hover { color: var(--accent); }
 
-/* ── Delete type annotations ── */
+/* ── Annotation type styles ── */
+.ann-item[data-type="add"] .note { border-left-color: rgba(91,138,94,0.2); }
+
+/* Delete type */
 .ann-item[data-type="delete"] .snippet { text-decoration: line-through; color: var(--danger); }
 .ann-item[data-type="delete"] .snippet::before,
 .ann-item[data-type="delete"] .snippet::after { color: var(--danger); }
@@ -505,7 +508,8 @@ body {
   border-radius: 4px;
   margin-bottom: 6px;
 }
-.type-badge.highlight { background: var(--accent-light); color: var(--accent); }
+.type-badge.modify { background: var(--accent-light); color: var(--accent); }
+.type-badge.add { background: rgba(91,138,94,0.1); color: var(--success); }
 .type-badge.delete { background: var(--danger-light); color: var(--danger); }
 
 /* ── Toolbar keyboard hints ── */
@@ -583,7 +587,7 @@ body {
     <div class="ann-list" id="annList">
       <div class="empty-state" id="emptyState">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-        <p>Select any text in the preview, then press <kbd>H</kbd> to highlight or <kbd>D</kbd> to mark for deletion</p>
+        <p>Select text in the preview, then press <kbd>M</kbd> to modify, <kbd>A</kbd> to add, or <kbd>D</kbd> to delete</p>
       </div>
     </div>
   </div>
@@ -601,9 +605,14 @@ body {
 </div>
 
 <div class="ann-toolbar" id="annToolbar">
-  <button data-action="annotate">
+  <button data-action="modify">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-    Annotate <span class="kbd-hint">H</span>
+    Modify <span class="kbd-hint">M</span>
+  </button>
+  <div class="divider"></div>
+  <button data-action="add">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Add <span class="kbd-hint">A</span>
   </button>
   <div class="divider"></div>
   <button data-action="delete">
@@ -618,12 +627,15 @@ body {
 (function() {
   'use strict';
 
-  var TYPE_HIGHLIGHT = 'highlight';
+  var TYPE_MODIFY = 'modify';
+  var TYPE_ADD = 'add';
   var TYPE_DELETE = 'delete';
 
   var HIGHLIGHT_CSS = [
     '.ann-highlight { background: rgba(196,112,75,0.14) !important; border-bottom: 2px solid rgba(196,112,75,0.5) !important; cursor: pointer !important; transition: background 0.15s ease !important; }',
     '.ann-highlight:hover { background: rgba(196,112,75,0.25) !important; }',
+    '.ann-highlight-add { background: rgba(91,138,94,0.12) !important; border-bottom: 2px solid rgba(91,138,94,0.5) !important; cursor: pointer !important; transition: background 0.15s ease !important; }',
+    '.ann-highlight-add:hover { background: rgba(91,138,94,0.22) !important; }',
     '.ann-highlight-delete { background: rgba(184,84,80,0.1) !important; border-bottom: 2px solid rgba(184,84,80,0.5) !important; text-decoration: line-through !important; cursor: pointer !important; transition: background 0.15s ease !important; }',
     '.ann-highlight-delete:hover { background: rgba(184,84,80,0.2) !important; }'
   ].join('\n');
@@ -736,7 +748,7 @@ body {
   function wrapRangeInMark(range, id, type) {
     const doc = frame.contentDocument;
     const mark = doc.createElement('mark');
-    mark.className = type === TYPE_DELETE ? 'ann-highlight-delete' : 'ann-highlight';
+    mark.className = type === TYPE_DELETE ? 'ann-highlight-delete' : type === TYPE_ADD ? 'ann-highlight-add' : 'ann-highlight';
     mark.dataset.annId = id;
     try {
       range.surroundContents(mark);
@@ -852,7 +864,7 @@ body {
     // Save selection position for popover use by keyboard shortcuts
     lastSelectionPos = { x: iframeRect.left + e.clientX, y: iframeRect.top + e.clientY + 10 };
 
-    const tw = 260;
+    const tw = 360;
     if (x + tw > window.innerWidth) x = window.innerWidth - tw - 10;
     if (x < 10) x = 10;
     if (y < 10) y = iframeRect.top + e.clientY + 20;
@@ -885,7 +897,6 @@ body {
   function openPopoverForNew(x, y) {
     if (!currentSelection) return;
     editingAnnotationIdx = -1;
-    notePopoverLabel.textContent = 'New annotation';
     const truncated = currentSelection.text.length > 120
       ? currentSelection.text.substring(0, 120) + '...'
       : currentSelection.text;
@@ -902,7 +913,9 @@ body {
     const ann = annotations[idx];
     if (!ann) return;
     editingAnnotationIdx = idx;
+    var t = ann.type || TYPE_MODIFY;
     notePopoverLabel.textContent = 'Edit note';
+    notePopoverInput.placeholder = t === TYPE_ADD ? 'What to add after this text?' : t === TYPE_DELETE ? 'Reason for deletion' : 'What should be changed?';
     const truncated = ann.text.length > 120 ? ann.text.substring(0, 120) + '...' : ann.text;
     notePopoverSelected.textContent = truncated;
     notePopoverSelected.style.display = '';
@@ -936,13 +949,13 @@ body {
     const id = 'ann-' + (++highlightCounter);
     const ann = {
       id: id,
-      type: TYPE_HIGHLIGHT,
+      type: pendingType,
       text: currentSelection.text.substring(0, 500),
       note: note,
       context: currentSelection.text.substring(0, 60)
     };
 
-    highlightRange(currentSelection.range, id, TYPE_HIGHLIGHT);
+    highlightRange(currentSelection.range, id, pendingType);
     try { frame.contentDocument.getSelection().removeAllRanges(); } catch(e) {}
 
     annotations.push(ann);
@@ -951,17 +964,31 @@ body {
     closePopover();
   }
 
-  function doAnnotateAction() {
+  var pendingType = TYPE_MODIFY;
+
+  function doModifyAction() {
+    pendingType = TYPE_MODIFY;
     hideToolbar();
     popoverPosition = lastSelectionPos;
+    notePopoverLabel.textContent = 'Modify';
+    notePopoverInput.placeholder = 'What should be changed?';
+    openPopoverForNew(lastSelectionPos.x, lastSelectionPos.y);
+  }
+
+  function doAddAction() {
+    pendingType = TYPE_ADD;
+    hideToolbar();
+    popoverPosition = lastSelectionPos;
+    notePopoverLabel.textContent = 'Add content';
+    notePopoverInput.placeholder = 'What to add after this text?';
     openPopoverForNew(lastSelectionPos.x, lastSelectionPos.y);
   }
 
   function doDeleteAction() {
     if (!currentSelection) return;
     hideToolbar();
-    const id = 'ann-' + (++highlightCounter);
-    const ann = {
+    var id = 'ann-' + (++highlightCounter);
+    var ann = {
       id: id,
       type: TYPE_DELETE,
       text: currentSelection.text.substring(0, 500),
@@ -979,7 +1006,8 @@ body {
 
   function handleToolbarKeydown(e) {
     if (!toolbar.classList.contains('visible')) return;
-    if (e.key === 'h' || e.key === 'H') { e.preventDefault(); doAnnotateAction(); }
+    if (e.key === 'm' || e.key === 'M') { e.preventDefault(); doModifyAction(); }
+    if (e.key === 'a' || e.key === 'A') { e.preventDefault(); doAddAction(); }
     if (e.key === 'd' || e.key === 'D') { e.preventDefault(); doDeleteAction(); }
     if (e.key === 'Escape') hideToolbar();
   }
@@ -989,7 +1017,8 @@ body {
       e.preventDefault();
       e.stopPropagation();
       if (btn.dataset.action === 'delete') doDeleteAction();
-      else doAnnotateAction();
+      else if (btn.dataset.action === 'add') doAddAction();
+      else doModifyAction();
     });
   });
 
@@ -1024,11 +1053,11 @@ body {
       item.dataset.id = ann.id;
       item.style.animationDelay = (idx * 30) + 'ms';
 
-      const annType = ann.type || TYPE_HIGHLIGHT;
+      const annType = ann.type || TYPE_MODIFY;
       item.dataset.type = annType;
       const truncText = ann.text.length > 100 ? ann.text.substring(0, 100) + '...' : ann.text;
-      const badgeClass = annType === 'delete' ? 'delete' : 'highlight';
-      const badgeLabel = annType === 'delete' ? 'Delete' : 'Highlight';
+      const badgeClass = annType;
+      const badgeLabel = annType.charAt(0).toUpperCase() + annType.slice(1);
       const noteHtml = ann.note
         ? `<div class="note"><span class="note-text">${escapeHtml(ann.note)}</span></div>`
         : `<div class="add-note-hint">Click to add a note</div>`;
@@ -1103,15 +1132,18 @@ body {
     md += `Below are annotations on this document. Each annotation includes the original text and a reviewer note.\n\n`;
     md += `## Annotations\n\n`;
     annotations.forEach((ann, i) => {
-      const annType = (ann.type || TYPE_HIGHLIGHT).toUpperCase();
+      const annType = (ann.type || TYPE_MODIFY).toUpperCase();
       const text = ann.text.replace(/\n/g, ' ');
       md += `### ${i + 1}. [${annType}]\n`;
       if (ann.type === TYPE_DELETE) {
         md += `> ~~${text}~~\n`;
         if (ann.note) md += `\n**Reason:** ${ann.note}\n`;
+      } else if (ann.type === TYPE_ADD) {
+        md += `> ${text}\n`;
+        if (ann.note) md += `\n**Insert after:** ${ann.note}\n`;
       } else {
         md += `> ${text}\n`;
-        if (ann.note) md += `\n**Note:** ${ann.note}\n`;
+        if (ann.note) md += `\n**Change to:** ${ann.note}\n`;
       }
       md += `\n`;
     });

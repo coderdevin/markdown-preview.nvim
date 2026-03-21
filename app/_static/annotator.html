@@ -944,6 +944,18 @@ body {
     });
   }
 
+  // Find the minimal changed substring between two strings
+  function minimalDiff(oldStr, newStr) {
+    var i = 0;
+    while (i < oldStr.length && i < newStr.length && oldStr[i] === newStr[i]) i++;
+    var j = 0;
+    while (j < oldStr.length - i && j < newStr.length - i && oldStr[oldStr.length - 1 - j] === newStr[newStr.length - 1 - j]) j++;
+    return {
+      oldText: oldStr.slice(i, oldStr.length - j),
+      newText: newStr.slice(i, newStr.length - j)
+    };
+  }
+
   function collectChanges(doc) {
     var changes = [];
     doc.querySelectorAll('[data-source-line]').forEach(function(el) {
@@ -951,7 +963,10 @@ body {
       var currentText = el.textContent;
       var originalText = textSnapshot.get(el);
       if (originalText != null && currentText !== originalText) {
-        changes.push({ line: line, oldText: originalText, newText: currentText, el: el });
+        var diff = minimalDiff(originalText, currentText);
+        if (diff.oldText !== diff.newText) {
+          changes.push({ line: line, oldText: diff.oldText, newText: diff.newText, el: el });
+        }
       }
     });
     return changes;

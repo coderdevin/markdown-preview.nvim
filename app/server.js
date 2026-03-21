@@ -145,11 +145,13 @@ exports.run = function () {
         if (result.applied > 0 && result.content !== content) {
           await fs.promises.writeFile(resolvedFilePath, result.content, 'utf-8')
           await plugin.nvim.command('checktime')
-          await emitRefreshContent(targetBufnr)
           logger.info('inline edit: ', result.applied, 'changes written to', resolvedFilePath)
         }
 
         reply({ ok: true, applied: result.applied, unapplied: result.unapplied.length })
+        if (result.applied > 0 && result.content !== content) {
+          emitRefreshContent(targetBufnr)
+        }
       } catch (e) {
         logger.error('update_lines error: ', e)
         reply({ ok: false, applied: 0, error: String((e && e.message) || e) })
@@ -211,12 +213,13 @@ exports.run = function () {
         const resolvedFilePath = resolveBufferPath(filePath, nvimCwd)
         await fs.promises.writeFile(resolvedFilePath, content, 'utf-8')
         await plugin.nvim.command('checktime')
-        await emitRefreshContent(targetBufnr)
         logger.info('source write: bytes=', Buffer.byteLength(content, 'utf8'), 'path=', resolvedFilePath)
         reply({
           ok: true,
           filePath: resolvedFilePath
         })
+        // Refresh preview after reply so the callback isn't lost
+        emitRefreshContent(targetBufnr)
       } catch (e) {
         logger.error('write_source error: ', e)
         reply({ ok: false, error: String((e && e.message) || e) })

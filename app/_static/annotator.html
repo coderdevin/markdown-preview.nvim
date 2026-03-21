@@ -965,7 +965,14 @@ body {
       if (originalText != null && currentText !== originalText) {
         var diff = minimalDiff(originalText, currentText);
         if (diff.oldText !== diff.newText) {
-          changes.push({ line: line, oldText: diff.oldText, newText: diff.newText, el: el });
+          changes.push({
+            line: line,
+            oldText: diff.oldText,
+            newText: diff.newText,
+            oldLineText: originalText,
+            newLineText: currentText,
+            el: el
+          });
         }
       }
     });
@@ -982,22 +989,42 @@ body {
       var sock = frame.contentWindow && frame.contentWindow.socket;
       if (!sock) { isEditing = false; return; }
 
-      var payload = changes.map(function(c) { return { line: c.line, oldText: c.oldText, newText: c.newText }; });
-      sock.emit('update_lines', { bufnr: bufnr, changes: payload });
-
-      // Update snapshot and show feedback
-      changes.forEach(function(c) {
-        textSnapshot.set(c.el, c.el.textContent);
-        c.el.style.animation = 'none';
-        c.el.offsetHeight; // force reflow
-        c.el.style.animation = 'saveFlash 0.6s ease-out';
+      var payload = changes.map(function(c) {
+        return {
+          line: c.line,
+          oldText: c.oldText,
+          newText: c.newText,
+          oldLineText: c.oldLineText,
+          newLineText: c.newLineText
+        };
       });
 
-      editCount += changes.length;
-      editCounterEl.textContent = editCount + (editCount === 1 ? ' edit' : ' edits');
-      editCounterEl.classList.add('visible');
-      showToast('Saved');
-      isEditing = false;
+      sock.emit('update_lines', { bufnr: bufnr, changes: payload }, function(result) {
+        if (!result || !result.ok) {
+          showToast('Save failed');
+          isEditing = false;
+          return;
+        }
+
+        if (!result.applied) {
+          showToast('No changes saved');
+          isEditing = false;
+          return;
+        }
+
+        changes.forEach(function(c) {
+          textSnapshot.set(c.el, c.el.textContent);
+          c.el.style.animation = 'none';
+          c.el.offsetHeight; // force reflow
+          c.el.style.animation = 'saveFlash 0.6s ease-out';
+        });
+
+        editCount += result.applied;
+        editCounterEl.textContent = editCount + (editCount === 1 ? ' edit' : ' edits');
+        editCounterEl.classList.add('visible');
+        showToast('Saved');
+        isEditing = false;
+      });
     } catch(e) {
       isEditing = false;
     }

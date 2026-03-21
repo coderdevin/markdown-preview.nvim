@@ -7,6 +7,7 @@ exports.run = function () {
   const fs = require('fs')
   const opener = require('./lib/util/opener')
   const logger = require('./lib/util/logger')('app/server')
+  const { applyInlineChangesToContent } = require('./lib/util/applyInlineChanges')
   const { getIP } = require('./lib/util/getIP')
   const routes = require('./routes')
 
@@ -90,34 +91,40 @@ exports.run = function () {
       }
     })
 
-    client.on('update_lines', async ({ bufnr: updateBufnr, changes }) => {
+    client.on('update_lines', async ({ bufnr: updateBufnr, changes }, done) => {
+      const reply = typeof done === 'function' ? done : function () {}
       try {
         const targetBufnr = Number(updateBufnr || bufnr)
         const buffers = await plugin.nvim.buffers
         const buffer = buffers.find(b => b.id === targetBufnr)
-        if (!buffer) return
+        if (!buffer) {
+          reply({ ok: false, applied: 0, error: 'buffer not found' })
+          return
+        }
 
         const filePath = await buffer.name
-        if (!filePath) return
+        if (!filePath) {
+          reply({ ok: false, applied: 0, error: 'buffer has no file path' })
+          return
+        }
 
         let content = await fs.promises.readFile(filePath, 'utf-8')
-        let applied = 0
-        for (const change of changes) {
-          if (change.oldText && content.includes(change.oldText)) {
-            content = content.replace(change.oldText, change.newText)
-            applied++
-          } else {
-            logger.error('update_lines: text not found: ', JSON.stringify(change.oldText).slice(0, 50))
-          }
+        const result = applyInlineChangesToContent(content, changes)
+
+        if (result.unapplied.length > 0) {
+          logger.error('update_lines: unapplied changes: ', result.unapplied.length)
         }
 
-        if (applied > 0) {
-          await fs.promises.writeFile(filePath, content, 'utf-8')
-          plugin.nvim.command('checktime')
-          logger.info('inline edit: ', applied, 'changes written to', filePath)
+        if (result.applied > 0 && result.content !== content) {
+          await fs.promises.writeFile(filePath, result.content, 'utf-8')
+          await plugin.nvim.command('checktime')
+          logger.info('inline edit: ', result.applied, 'changes written to', filePath)
         }
+
+        reply({ ok: true, applied: result.applied, unapplied: result.unapplied.length })
       } catch (e) {
         logger.error('update_lines error: ', e)
+        reply({ ok: false, applied: 0, error: String((e && e.message) || e) })
       }
     })
 

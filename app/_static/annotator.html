@@ -636,7 +636,6 @@ body {
   </div>
   <input type="text" id="urlInput" spellcheck="false" placeholder="Preview URL">
   <div class="topbar-actions">
-    <button class="btn-ghost" id="loadBtn">Load</button>
     <button class="btn-ghost" id="reloadBtn">Reload</button>
   </div>
 </div>
@@ -729,7 +728,6 @@ body {
   const annList = document.getElementById('annList');
   const emptyState = document.getElementById('emptyState');
   const urlInput = document.getElementById('urlInput');
-  const loadBtn = document.getElementById('loadBtn');
   const reloadBtn = document.getElementById('reloadBtn');
   const copyAllBtn = document.getElementById('copyAllBtn');
   const clearAllBtn = document.getElementById('clearAllBtn');
@@ -813,9 +811,8 @@ body {
     frame.src = '';
     setTimeout(() => { frame.src = src; }, 0);
   }
-  loadBtn.addEventListener('click', () => { frame.src = urlInput.value.trim(); });
   reloadBtn.addEventListener('click', reloadIframe);
-  urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadBtn.click(); });
+  urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') reloadIframe(); });
 
   // --- Inject highlight CSS into iframe ---
   function injectStyles() {

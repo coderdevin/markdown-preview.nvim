@@ -25,6 +25,7 @@ Main features:
 - Task lists
 - Local images
 - Flexible configuration
+- **Markdown Annotator** — highlight text and add notes directly on the preview
 
 **Note** the plugin `mathjax-support-for-mkdp` is not needed for typesetting math.
 
@@ -251,11 +252,13 @@ Mappings:
 <Plug>MarkdownPreview
 <Plug>MarkdownPreviewStop
 <Plug>MarkdownPreviewToggle
+<Plug>MarkdownAnnotate
 
 " example
 nmap <C-s> <Plug>MarkdownPreview
 nmap <M-s> <Plug>MarkdownPreviewStop
 nmap <C-p> <Plug>MarkdownPreviewToggle
+nmap <leader>a <Plug>MarkdownAnnotate
 ```
 
 Commands:
@@ -264,8 +267,33 @@ Commands:
 " Start the preview
 :MarkdownPreview
 
-" Stop the preview"
+" Stop the preview
 :MarkdownPreviewStop
+
+" Open the annotator (starts server if needed)
+:MarkdownAnnotate
+```
+
+### Markdown Annotator
+
+The annotator lets you highlight text and add notes on top of the live markdown preview. It opens in a separate browser tab with the preview embedded in an iframe (same-origin).
+
+**Features:**
+- Select text in the preview to highlight and annotate
+- Side panel lists all annotations with their notes
+- **Copy All** — exports annotations as a markdown summary to clipboard
+- **Clear All** — removes all annotations
+- Annotations persist in browser localStorage (keyed by filename)
+- Live sync — edits in Vim are reflected in the annotator preview in real time
+
+**Usage:**
+
+```vim
+" Open annotator (starts the preview server automatically if not running)
+:MarkdownAnnotate
+
+" Or map to a key
+nmap <leader>a <Plug>MarkdownAnnotate
 ```
 
 ### Custom Examples

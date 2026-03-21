@@ -105,7 +105,7 @@ exports.run = function () {
     server.listen({
       host,
       port
-    }, function () {
+    }, async function () {
       logger.info('server run: ', port)
       function refreshPage ({ bufnr, data }) {
         logger.info('refresh page: ', bufnr)
@@ -136,6 +136,26 @@ exports.run = function () {
         })
         clients = {}
       }
+      async function buildUrl (path) {
+        const openIp = await plugin.nvim.getVar('mkdp_open_ip')
+        const openHost = openIp !== '' ? openIp : (openToTheWord ? getIP() : 'localhost')
+        return `http://${openHost}:${port}${path}`
+      }
+      async function launchInBrowser (url, label) {
+        const browserfunc = await plugin.nvim.getVar('mkdp_browserfunc')
+        if (browserfunc !== '') {
+          logger.info(`open ${label} [${browserfunc}]: `, url)
+          plugin.nvim.call(browserfunc, [url])
+        } else {
+          const browser = await plugin.nvim.getVar('mkdp_browser')
+          logger.info(`open ${label} [${browser || 'default'}]: `, url)
+          if (browser !== '') {
+            openUrl(url, browser)
+          } else {
+            openUrl(url)
+          }
+        }
+      }
       async function openBrowser ({ bufnr }) {
         const combinePreview = await plugin.nvim.getVar('mkdp_combine_preview')
         if (combinePreview && Object.values(clients).some(cs => cs.some(c => c.connected))) {
@@ -148,36 +168,33 @@ exports.run = function () {
             })
           })
         } else {
-          const openIp = await plugin.nvim.getVar('mkdp_open_ip')
-          const openHost = openIp !== '' ? openIp : (openToTheWord ? getIP() : 'localhost')
-          const url = `http://${openHost}:${port}/page/${bufnr}`
-          const browserfunc = await plugin.nvim.getVar('mkdp_browserfunc')
-          if (browserfunc !== '') {
-            logger.info(`open page [${browserfunc}]: `, url)
-            plugin.nvim.call(browserfunc, [url])
-          } else {
-            const browser = await plugin.nvim.getVar('mkdp_browser')
-            logger.info(`open page [${browser || 'default'}]: `, url)
-            if (browser !== '') {
-              openUrl(url, browser)
-            } else {
-              openUrl(url)
-            }
-          }
+          const url = await buildUrl(`/page/${bufnr}`)
+          await launchInBrowser(url, 'page')
           const isEchoUrl = await plugin.nvim.getVar('mkdp_echo_preview_url')
           if (isEchoUrl) {
             plugin.nvim.call('mkdp#util#echo_url', [url])
           }
         }
       }
+      async function openAnnotator ({ bufnr }) {
+        const url = await buildUrl(`/_static/annotator.html?page=${bufnr}`)
+        await launchInBrowser(url, 'annotator')
+      }
       plugin.init({
         refreshPage,
         closePage,
         closeAllPages,
-        openBrowser
+        openBrowser,
+        openAnnotator
       })
 
-      plugin.nvim.call('mkdp#util#open_browser')
+      const openAnnotatorOnStart = await plugin.nvim.getVar('mkdp_open_annotator_on_start')
+      if (openAnnotatorOnStart) {
+        await plugin.nvim.setVar('mkdp_open_annotator_on_start', 0)
+        plugin.nvim.call('mkdp#util#open_annotator')
+      } else {
+        plugin.nvim.call('mkdp#util#open_browser')
+      }
     })
   }
 

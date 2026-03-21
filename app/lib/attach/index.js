@@ -47,6 +47,11 @@ function default_1(options) {
                 bufnr
             });
         }
+        else if (method === 'open_annotator') {
+            app.openAnnotator({
+                bufnr
+            });
+        }
     }));
     nvim.on('request', (method, args, resp) => {
         if (method === 'close_all_pages') {

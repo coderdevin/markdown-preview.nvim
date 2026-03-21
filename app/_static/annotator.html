@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markdown Annotator</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+.topbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #16213e; border-bottom: 1px solid #0f3460; flex-shrink: 0; }
+.topbar label { font-size: 13px; color: #a0a0c0; white-space: nowrap; }
+.topbar input[type="text"] { flex: 1; padding: 5px 10px; border: 1px solid #0f3460; border-radius: 4px; background: #1a1a2e; color: #e0e0e0; font-size: 13px; font-family: monospace; }
+.topbar button { padding: 5px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; background: #0f3460; color: #e0e0e0; transition: background 0.15s; }
+.topbar button:hover { background: #1a5276; }
+
+.main { display: flex; flex: 1; overflow: hidden; }
+
+.preview-area { flex: 1; position: relative; background: #fff; }
+.preview-area iframe { width: 100%; height: 100%; border: none; }
+
+.ann-toolbar { position: fixed; display: none; z-index: 10000; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); gap: 4px; }
+.ann-toolbar.visible { display: flex; }
+.ann-toolbar button { padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; color: #fff; background: #3498db; transition: opacity 0.15s; }
+.ann-toolbar button:hover { opacity: 0.85; }
+
+.side-panel { width: 300px; min-width: 300px; background: #16213e; border-left: 1px solid #0f3460; display: flex; flex-direction: column; flex-shrink: 0; }
+.panel-header { padding: 12px; border-bottom: 1px solid #0f3460; display: flex; justify-content: space-between; align-items: center; }
+.panel-header h3 { font-size: 14px; color: #a0a0c0; }
+.panel-actions { display: flex; gap: 6px; }
+.panel-actions button { padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; transition: background 0.15s; }
+.btn-copy { background: #27ae60; color: #fff; }
+.btn-copy:hover { background: #2ecc71; }
+.btn-clear { background: #e74c3c; color: #fff; }
+.btn-clear:hover { background: #c0392b; }
+
+.ann-list { flex: 1; overflow-y: auto; padding: 8px; }
+.ann-list::-webkit-scrollbar { width: 6px; }
+.ann-list::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+
+.ann-item { background: #1a1a2e; border-radius: 6px; padding: 10px; margin-bottom: 8px; position: relative; cursor: pointer; border-left: 3px solid #3498db; transition: background 0.15s; }
+.ann-item:hover { background: #1e2a4a; }
+.ann-item .snippet { font-size: 12px; color: #c0c0d0; margin: 4px 0; line-height: 1.4; word-break: break-word; }
+.ann-item .note { font-size: 12px; color: #80d0ff; font-style: italic; margin-top: 4px; word-break: break-word; }
+.ann-item .remove-btn { position: absolute; top: 6px; right: 8px; background: none; border: none; color: #666; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 4px; }
+.ann-item .remove-btn:hover { color: #e74c3c; }
+
+.empty-state { text-align: center; padding: 40px 20px; color: #555; font-size: 13px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <label>Preview URL:</label>
+  <input type="text" id="urlInput" spellcheck="false">
+  <button id="loadBtn">Load</button>
+  <button id="reloadBtn">Reload</button>
+</div>
+
+<div class="main">
+  <div class="preview-area">
+    <iframe id="previewFrame"></iframe>
+  </div>
+
+  <div class="side-panel">
+    <div class="panel-header">
+      <h3>Annotations</h3>
+      <div class="panel-actions">
+        <button class="btn-copy" id="copyAllBtn" title="Copy all as markdown">Copy All</button>
+        <button class="btn-clear" id="clearAllBtn" title="Remove all annotations">Clear All</button>
+      </div>
+    </div>
+    <div class="ann-list" id="annList">
+      <div class="empty-state">
+        Select text in the preview<br>to create annotations
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ann-toolbar" id="annToolbar">
+  <button data-action="annotate">Annotate</button>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var HIGHLIGHT_CSS = '.ann-highlight { background: rgba(52, 152, 219, 0.25) !important; border-bottom: 2px solid #3498db !important; cursor: pointer !important; }';
+
+  const frame = document.getElementById('previewFrame');
+  const toolbar = document.getElementById('annToolbar');
+  const annList = document.getElementById('annList');
+  const urlInput = document.getElementById('urlInput');
+  const loadBtn = document.getElementById('loadBtn');
+  const reloadBtn = document.getElementById('reloadBtn');
+  const copyAllBtn = document.getElementById('copyAllBtn');
+  const clearAllBtn = document.getElementById('clearAllBtn');
+
+  let annotations = [];
+  let currentSelection = null;
+  let highlightCounter = 0;
+
+  // --- Init from query params ---
+  const params = new URLSearchParams(window.location.search);
+  const bufnr = params.get('page');
+  if (bufnr) {
+    const previewPath = '/page/' + bufnr;
+    frame.src = previewPath;
+    urlInput.value = window.location.origin + previewPath;
+  } else {
+    frame.src = '/';
+    urlInput.value = window.location.origin;
+  }
+
+  // --- Storage ---
+  function storageKey() {
+    try {
+      const title = frame.contentDocument && frame.contentDocument.title;
+      if (title) return 'md-annotator:' + title;
+    } catch(e) {}
+    return 'md-annotator:' + urlInput.value.trim();
+  }
+
+  function saveAnnotations() {
+    try {
+      const data = annotations.map(a => ({
+        id: a.id, text: a.text, note: a.note, context: a.context
+      }));
+      localStorage.setItem(storageKey(), JSON.stringify(data));
+    } catch(e) {}
+  }
+
+  function loadAnnotations() {
+    try {
+      const raw = localStorage.getItem(storageKey());
+      if (raw) {
+        annotations = JSON.parse(raw);
+        annotations.forEach(a => { if (!a.id) a.id = 'ann-' + (++highlightCounter); });
+      }
+    } catch(e) { annotations = []; }
+  }
+
+  // --- URL handling ---
+  loadBtn.addEventListener('click', () => { frame.src = urlInput.value.trim(); });
+  reloadBtn.addEventListener('click', () => {
+    try { frame.contentWindow.location.reload(); } catch(e) { frame.src = urlInput.value.trim(); }
+  });
+  urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadBtn.click(); });
+
+  // --- Inject highlight CSS into iframe ---
+  function injectStyles() {
+    try {
+      const doc = frame.contentDocument;
+      if (!doc || doc.getElementById('ann-styles')) return;
+      const style = doc.createElement('style');
+      style.id = 'ann-styles';
+      style.textContent = HIGHLIGHT_CSS;
+      doc.head.appendChild(style);
+    } catch(e) {}
+  }
+
+  // --- Shared: wrap a range in a highlight mark ---
+  function wrapRangeInMark(range, id) {
+    const doc = frame.contentDocument;
+    const mark = doc.createElement('mark');
+    mark.className = 'ann-highlight';
+    mark.dataset.annId = id;
+    try {
+      range.surroundContents(mark);
+    } catch(e) {
+      // surroundContents fails when range spans multiple elements
+      const frag = range.cloneContents();
+      mark.appendChild(frag);
+      range.deleteContents();
+      range.insertNode(mark);
+    }
+    return mark;
+  }
+
+  // --- Shared: unwrap a highlight mark, restoring original DOM ---
+  function unwrapMark(el) {
+    const parent = el.parentNode;
+    while (el.firstChild) parent.insertBefore(el.firstChild, el);
+    parent.removeChild(el);
+    parent.normalize();
+  }
+
+  function highlightRange(range, id) {
+    try {
+      if (!frame.contentDocument) return null;
+      return wrapRangeInMark(range, id);
+    } catch(e) { return null; }
+  }
+
+  // --- Re-apply highlights after iframe content reload ---
+  function reapplyHighlights() {
+    try {
+      const doc = frame.contentDocument;
+      if (!doc || !doc.body) return;
+      injectStyles();
+      annotations.forEach(ann => {
+        if (!ann.text) return;
+        findAndHighlight(doc.body, ann.text, ann.id);
+      });
+    } catch(e) {}
+  }
+
+  function findAndHighlight(root, text, id) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+    const searchText = text.substring(0, 100);
+    let node;
+    while (node = walker.nextNode()) {
+      const idx = node.textContent.indexOf(searchText);
+      if (idx !== -1) {
+        const doc = frame.contentDocument;
+        const range = doc.createRange();
+        range.setStart(node, idx);
+        range.setEnd(node, Math.min(idx + text.length, node.textContent.length));
+        try {
+          wrapRangeInMark(range, id);
+        } catch(e) {}
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // --- Selection handling in iframe ---
+  function setupIframeListeners() {
+    try {
+      const doc = frame.contentDocument;
+      if (!doc || doc._annListenersAttached) return;
+      doc._annListenersAttached = true;
+
+      injectStyles();
+
+      doc.addEventListener('mouseup', (e) => {
+        setTimeout(() => {
+          const sel = doc.getSelection();
+          if (sel && sel.toString().trim().length > 0) {
+            currentSelection = {
+              text: sel.toString().trim(),
+              range: sel.getRangeAt(0).cloneRange()
+            };
+            showToolbar(e);
+          } else {
+            hideToolbar();
+            currentSelection = null;
+          }
+        }, 10);
+      });
+
+      doc.addEventListener('mousedown', (e) => {
+        if (!toolbar.contains(e.target)) {
+          hideToolbar();
+        }
+      });
+
+      reapplyHighlights();
+    } catch(e) {
+      console.warn('Cannot access iframe. Highlights won\'t show in preview.');
+    }
+  }
+
+  // Single consolidated load handler
+  frame.addEventListener('load', () => {
+    setupIframeListeners();
+    loadAnnotations();
+    renderList();
+    // Retry for cases where iframe DOM isn't fully ready at load time
+    setTimeout(setupIframeListeners, 500);
+    // Set up MutationObserver for live content updates
+    setTimeout(observeIframeChanges, 1000);
+  });
+
+  // --- Toolbar ---
+  function showToolbar(e) {
+    const iframeRect = frame.getBoundingClientRect();
+    let x = iframeRect.left + e.clientX;
+    let y = iframeRect.top + e.clientY - 45;
+
+    const tw = 120;
+    if (x + tw > window.innerWidth) x = window.innerWidth - tw - 10;
+    if (x < 10) x = 10;
+    if (y < 10) y = iframeRect.top + e.clientY + 20;
+
+    toolbar.style.left = x + 'px';
+    toolbar.style.top = y + 'px';
+    toolbar.classList.add('visible');
+  }
+
+  function hideToolbar() {
+    toolbar.classList.remove('visible');
+  }
+
+  toolbar.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+
+  // --- Annotation action ---
+  toolbar.querySelector('button').addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!currentSelection) return;
+
+    const note = prompt('Add a note (optional):') || '';
+
+    const id = 'ann-' + (++highlightCounter);
+    const ann = {
+      id: id,
+      text: currentSelection.text.substring(0, 500),
+      note: note,
+      context: currentSelection.text.substring(0, 60)
+    };
+
+    highlightRange(currentSelection.range, id);
+    try { frame.contentDocument.getSelection().removeAllRanges(); } catch(e) {}
+
+    annotations.push(ann);
+    saveAnnotations();
+    renderList();
+    hideToolbar();
+    currentSelection = null;
+  });
+
+  // --- Render annotation list ---
+  function renderList() {
+    if (annotations.length === 0) {
+      annList.innerHTML = '<div class="empty-state">Select text in the preview<br>to create annotations</div>';
+      return;
+    }
+
+    annList.innerHTML = '';
+    annotations.forEach((ann, idx) => {
+      const item = document.createElement('div');
+      item.className = 'ann-item';
+      item.dataset.id = ann.id;
+
+      const truncText = ann.text.length > 80 ? ann.text.substring(0, 80) + '...' : ann.text;
+      const noteHtml = ann.note ? `<div class="note">${escapeHtml(ann.note)}</div>` : '';
+
+      item.innerHTML = `
+        <button class="remove-btn" data-idx="${idx}" title="Remove">&times;</button>
+        <div class="snippet">"${escapeHtml(truncText)}"</div>
+        ${noteHtml}
+      `;
+
+      item.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-btn')) return;
+        scrollToAnnotation(ann.id);
+      });
+
+      item.querySelector('.remove-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeAnnotation(idx);
+      });
+
+      annList.appendChild(item);
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function scrollToAnnotation(id) {
+    try {
+      const doc = frame.contentDocument;
+      const el = doc.querySelector(`[data-ann-id="${id}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.transition = 'outline 0.15s';
+        el.style.outline = '3px solid #fff';
+        setTimeout(() => { el.style.outline = 'none'; }, 1500);
+      }
+    } catch(e) {}
+  }
+
+  function removeAnnotation(idx) {
+    const ann = annotations[idx];
+    try {
+      const doc = frame.contentDocument;
+      const el = doc.querySelector(`[data-ann-id="${ann.id}"]`);
+      if (el) unwrapMark(el);
+    } catch(e) {}
+
+    annotations.splice(idx, 1);
+    saveAnnotations();
+    renderList();
+  }
+
+  // --- Copy All ---
+  copyAllBtn.addEventListener('click', () => {
+    if (annotations.length === 0) return;
+
+    let title;
+    try { title = frame.contentDocument.title || urlInput.value.trim(); }
+    catch(e) { title = urlInput.value.trim(); }
+
+    let md = `## Annotations - ${title}\n\n`;
+    annotations.forEach(ann => {
+      const text = ann.text.replace(/\n/g, ' ').substring(0, 200);
+      md += ann.note
+        ? `- "${text}": ${ann.note}\n`
+        : `- "${text}"\n`;
+    });
+
+    navigator.clipboard.writeText(md).then(() => {
+      copyAllBtn.textContent = 'Copied!';
+      setTimeout(() => { copyAllBtn.textContent = 'Copy All'; }, 1500);
+    }).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      copyAllBtn.textContent = 'Copied!';
+      setTimeout(() => { copyAllBtn.textContent = 'Copy All'; }, 1500);
+    });
+  });
+
+  // --- Clear All ---
+  clearAllBtn.addEventListener('click', () => {
+    if (annotations.length === 0) return;
+    if (!confirm('Clear all annotations?')) return;
+
+    try {
+      const doc = frame.contentDocument;
+      doc.querySelectorAll('[data-ann-id]').forEach(el => unwrapMark(el));
+    } catch(e) {}
+
+    annotations = [];
+    localStorage.removeItem(storageKey());
+    renderList();
+  });
+
+  document.addEventListener('mousedown', () => { hideToolbar(); });
+
+  // --- Observe iframe DOM changes (markdown-preview hot-reloads content) ---
+  function observeIframeChanges() {
+    try {
+      const doc = frame.contentDocument;
+      if (!doc || !doc.body) return;
+
+      const observer = new MutationObserver(() => {
+        clearTimeout(observer._timer);
+        observer._timer = setTimeout(() => {
+          injectStyles();
+          if (!doc.querySelector('[data-ann-id]') && annotations.length > 0) {
+            reapplyHighlights();
+          }
+        }, 300);
+      });
+
+      observer.observe(doc.body, { childList: true, subtree: true });
+    } catch(e) {}
+  }
+
+  // --- Init ---
+  loadAnnotations();
+  renderList();
+
+})();
+</script>
+</body>
+</html>

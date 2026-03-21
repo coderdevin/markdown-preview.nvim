@@ -89,6 +89,26 @@ exports.run = function () {
       }
     })
 
+    client.on('update_lines', async ({ bufnr: updateBufnr, changes }) => {
+      try {
+        const targetBufnr = Number(updateBufnr || bufnr)
+        const buffers = await plugin.nvim.buffers
+        const buffer = buffers.find(b => b.id === targetBufnr)
+        if (!buffer) return
+
+        for (const change of changes) {
+          const lines = await buffer.getLines({ start: change.line, end: change.line + 1 })
+          if (lines[0] && lines[0].includes(change.oldText)) {
+            const newLine = lines[0].replace(change.oldText, change.newText)
+            await buffer.setLines(newLine, { start: change.line, end: change.line + 1 })
+          }
+        }
+        logger.info('inline edit: ', changes.length, 'changes applied')
+      } catch (e) {
+        logger.error('update_lines error: ', e)
+      }
+    })
+
     client.on('disconnect', function () {
       logger.info('disconnect: ', client.id)
       clients[bufnr] = (clients[bufnr] || []).map(c => c.id !== client.id)

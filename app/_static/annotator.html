@@ -529,6 +529,26 @@ body {
   flex-shrink: 0;
 }
 
+/* ── Inline edit flash ── */
+@keyframes saveFlash {
+  0% { box-shadow: 0 0 0 0 rgba(91,138,94,0.4); }
+  50% { box-shadow: 0 0 0 3px rgba(91,138,94,0.2); }
+  100% { box-shadow: 0 0 0 0 rgba(91,138,94,0); }
+}
+
+/* ── Edit counter in topbar ── */
+.edit-counter {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--success);
+  padding: 3px 8px;
+  background: rgba(91,138,94,0.1);
+  border-radius: 99px;
+  display: none;
+  flex-shrink: 0;
+}
+.edit-counter.visible { display: inline-block; }
+
 /* Confirmation toast */
 .toast {
   position: fixed;
@@ -635,6 +655,7 @@ body {
     <span>Annotator</span>
   </div>
   <input type="text" id="urlInput" spellcheck="false" placeholder="Preview URL">
+  <span class="edit-counter" id="editCounter"></span>
   <div class="topbar-actions">
     <button class="btn-ghost" id="reloadBtn">Reload</button>
   </div>
@@ -732,6 +753,7 @@ body {
   const copyAllBtn = document.getElementById('copyAllBtn');
   const clearAllBtn = document.getElementById('clearAllBtn');
   const annCount = document.getElementById('annCount');
+  const editCounterEl = document.getElementById('editCounter');
   const noteOverlay = document.getElementById('noteOverlay');
   const notePopover = document.getElementById('notePopover');
   const notePopoverLabel = document.getElementById('notePopoverLabel');
@@ -821,7 +843,7 @@ body {
       if (!doc || doc.getElementById('ann-styles')) return;
       const style = doc.createElement('style');
       style.id = 'ann-styles';
-      style.textContent = HIGHLIGHT_CSS;
+      style.textContent = HIGHLIGHT_CSS + '\n@keyframes saveFlash { 0% { box-shadow: 0 0 0 0 rgba(91,138,94,0.4); } 50% { box-shadow: 0 0 0 3px rgba(91,138,94,0.2); } 100% { box-shadow: 0 0 0 0 rgba(91,138,94,0); } }';
       doc.head.appendChild(style);
     } catch(e) {}
   }
@@ -917,6 +939,89 @@ body {
     return false;
   }
 
+  // --- Inline editing ---
+  var textSnapshot = {};
+  var isEditing = false;
+  var editTimer = null;
+  var editCount = 0;
+
+  function snapshotText(doc) {
+    textSnapshot = {};
+    doc.querySelectorAll('[data-source-line]').forEach(function(el) {
+      textSnapshot[el.getAttribute('data-source-line')] = el.textContent;
+    });
+  }
+
+  function collectChanges(doc) {
+    var changes = [];
+    doc.querySelectorAll('[data-source-line]').forEach(function(el) {
+      var line = parseInt(el.getAttribute('data-source-line'));
+      var currentText = el.textContent;
+      var originalText = textSnapshot[line];
+      if (originalText != null && currentText !== originalText) {
+        changes.push({ line: line, oldText: originalText.trim(), newText: currentText.trim(), el: el });
+      }
+    });
+    return changes;
+  }
+
+  function saveInlineEdits() {
+    try {
+      var doc = frame.contentDocument;
+      if (!doc) return;
+      var changes = collectChanges(doc);
+      if (changes.length === 0) { isEditing = false; return; }
+
+      var sock = frame.contentWindow && frame.contentWindow.socket;
+      if (!sock) { isEditing = false; return; }
+
+      var payload = changes.map(function(c) { return { line: c.line, oldText: c.oldText, newText: c.newText }; });
+      sock.emit('update_lines', { bufnr: bufnr, changes: payload });
+
+      // Update snapshot and show feedback
+      changes.forEach(function(c) {
+        textSnapshot[c.line] = c.el.textContent;
+        c.el.style.animation = 'none';
+        c.el.offsetHeight; // force reflow
+        c.el.style.animation = 'saveFlash 0.6s ease-out';
+      });
+
+      editCount += changes.length;
+      editCounterEl.textContent = editCount + (editCount === 1 ? ' edit' : ' edits');
+      editCounterEl.classList.add('visible');
+      showToast('Saved');
+
+      // Allow refresh again after a short delay
+      setTimeout(function() { isEditing = false; }, 200);
+    } catch(e) {
+      isEditing = false;
+    }
+  }
+
+  function setupInlineEditing(doc) {
+    var markdownBody = doc.querySelector('.markdown-body');
+    if (!markdownBody || markdownBody._inlineEditAttached) return;
+    markdownBody._inlineEditAttached = true;
+
+    markdownBody.setAttribute('contenteditable', 'true');
+    markdownBody.style.outline = 'none';
+
+    snapshotText(doc);
+
+    markdownBody.addEventListener('input', function() {
+      isEditing = true;
+      clearTimeout(editTimer);
+      editTimer = setTimeout(saveInlineEdits, 500);
+    });
+
+    markdownBody.addEventListener('blur', function() {
+      if (isEditing) {
+        clearTimeout(editTimer);
+        saveInlineEdits();
+      }
+    }, true);
+  }
+
   // --- Selection handling in iframe ---
   function setupIframeListeners() {
     try {
@@ -960,7 +1065,10 @@ body {
     setupIframeListeners();
     loadAnnotations();
     renderList();
-    setTimeout(setupIframeListeners, 500);
+    setTimeout(() => {
+      setupIframeListeners();
+      try { setupInlineEditing(frame.contentDocument); } catch(e) {}
+    }, 500);
     setTimeout(observeIframeChanges, 1000);
   });
 
@@ -1308,12 +1416,15 @@ body {
       if (!doc || !doc.body) return;
 
       const observer = new MutationObserver(() => {
+        if (isEditing) return;
         clearTimeout(observer._timer);
         observer._timer = setTimeout(() => {
           injectStyles();
           if (!doc.querySelector('[data-ann-id]') && annotations.length > 0) {
             reapplyHighlights();
           }
+          // Re-snapshot after DOM refresh
+          snapshotText(doc);
         }, 300);
       });
 

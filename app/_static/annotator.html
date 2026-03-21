@@ -427,10 +427,33 @@ body {
   transition: all var(--transition);
 }
 
-.ann-item:hover .remove-btn { opacity: 1; }
+.ann-item .copy-btn {
+  position: absolute;
+  top: 10px;
+  right: 34px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all var(--transition);
+}
+
+.ann-item:hover .remove-btn,
+.ann-item:hover .copy-btn { opacity: 1; }
 .ann-item .remove-btn:hover {
   background: var(--danger-light);
   color: var(--danger);
+}
+.ann-item .copy-btn:hover {
+  background: var(--accent-light);
+  color: var(--accent);
 }
 
 /* ── Floating toolbar ── */
@@ -835,6 +858,7 @@ body {
   .source-btn { min-height: 44px; padding: 10px 12px; }
   .btn-panel { min-height: 44px; padding: 10px 12px; }
   .ann-item .remove-btn { width: 44px; height: 44px; top: 2px; right: 2px; opacity: 1; }
+  .ann-item .copy-btn { width: 44px; height: 44px; top: 2px; right: 46px; opacity: 1; }
   .ann-toolbar button { min-height: 44px; padding: 10px 16px; }
 }
 </style>
@@ -880,7 +904,7 @@ body {
         <span class="ann-count" id="annCount">0</span>
       </div>
       <div class="panel-actions">
-        <button class="btn-panel copy" id="copyAllBtn">Copy All</button>
+        <button class="btn-panel copy" id="copyAllBtn">Copy All Notes</button>
         <button class="btn-panel clear" id="clearAllBtn">Clear</button>
       </div>
     </div>
@@ -1047,8 +1071,8 @@ body {
     annCount.textContent = lastCount;
     annCount.classList.toggle('visible', lastCount > 0);
     copyAllBtn.textContent = lastCount > 0
-      ? 'Copy All (' + lastCount + ')'
-      : 'Copy All';
+      ? 'Copy All Notes (' + lastCount + ')'
+      : 'Copy All Notes';
   }
 
   // --- URL handling ---
@@ -1683,6 +1707,7 @@ body {
         : `<div class="add-note-hint">Click to add a note</div>`;
 
       item.innerHTML = `
+        <button class="copy-btn" title="Copy" aria-label="Copy annotation"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
         <button class="remove-btn" data-idx="${idx}" title="Remove" aria-label="Remove annotation">&times;</button>
         <span class="type-badge ${badgeClass}">${badgeLabel}</span>
         <div class="snippet">${escapeHtml(truncText)}</div>
@@ -1690,7 +1715,8 @@ body {
       `;
 
       item.addEventListener('click', (e) => {
-        if (e.target.classList.contains('remove-btn')) return;
+        if (e.target.closest('.remove-btn')) return;
+        if (e.target.closest('.copy-btn')) return;
         if (e.target.classList.contains('note-text') || e.target.classList.contains('add-note-hint')) {
           e.stopPropagation();
           openPopoverForEdit(idx, item);
@@ -1702,6 +1728,12 @@ body {
       item.querySelector('.remove-btn').addEventListener('click', (e) => {
         e.stopPropagation();
         removeAnnotation(idx);
+      });
+
+      item.querySelector('.copy-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        copyToClipboard(formatAnnotation(ann));
+        showToast('Copied');
       });
 
       annList.appendChild(item);
@@ -1736,6 +1768,35 @@ body {
     renderList();
   }
 
+  // --- Copy helpers ---
+  function formatAnnotation(ann) {
+    const annType = (ann.type || TYPE_MODIFY).toUpperCase();
+    const text = ann.text.replace(/\n/g, ' ');
+    let md = `[${annType}]\n`;
+    if (ann.type === TYPE_DELETE) {
+      md += `> ~~${text}~~\n`;
+      if (ann.note) md += `\n**Reason:** ${ann.note}\n`;
+    } else if (ann.type === TYPE_ADD) {
+      md += `> ${text}\n`;
+      if (ann.note) md += `\n**Add:** ${ann.note}\n`;
+    } else {
+      md += `> ${text}\n`;
+      if (ann.note) md += `\n**Change to:** ${ann.note}\n`;
+    }
+    return md;
+  }
+
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    });
+  }
+
   // --- Copy All ---
   copyAllBtn.addEventListener('click', () => {
     if (annotations.length === 0) return;
@@ -1747,20 +1808,7 @@ body {
     let md = `# Document Review: ${title}\n\n`;
     md += `## Annotations\n\n`;
     annotations.forEach((ann, i) => {
-      const annType = (ann.type || TYPE_MODIFY).toUpperCase();
-      const text = ann.text.replace(/\n/g, ' ');
-      md += `### ${i + 1}. [${annType}]\n`;
-      if (ann.type === TYPE_DELETE) {
-        md += `> ~~${text}~~\n`;
-        if (ann.note) md += `\n**Reason:** ${ann.note}\n`;
-      } else if (ann.type === TYPE_ADD) {
-        md += `> ${text}\n`;
-        if (ann.note) md += `\n**Add:** ${ann.note}\n`;
-      } else {
-        md += `> ${text}\n`;
-        if (ann.note) md += `\n**Change to:** ${ann.note}\n`;
-      }
-      md += `\n`;
+      md += `### ${i + 1}. ${formatAnnotation(ann)}\n`;
     });
     md += `---\n\n`;
     md += `Apply all annotations above to the original document:\n`;
@@ -1769,17 +1817,8 @@ body {
     md += `- [DELETE]: remove the quoted text\n`;
     md += `\nOutput the complete revised document in full. Do not summarize or skip sections.\n`;
 
-    navigator.clipboard.writeText(md).then(() => {
-      showToast('Copied to clipboard');
-    }).catch(() => {
-      const ta = document.createElement('textarea');
-      ta.value = md;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      showToast('Copied to clipboard');
-    });
+    copyToClipboard(md);
+    showToast('Copied to clipboard');
   });
 
   // --- Clear All ---

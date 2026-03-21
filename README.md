@@ -330,7 +330,7 @@ nmap <leader>a <Plug>MarkdownAnnotate
 
 Apply all annotations above to the original document:
 - [MODIFY]: rewrite the quoted text according to the "Change to" instruction
-- [ADD]: insert the new content after the quoted anchor text
+- [ADD]: write the new content according to the "Insert after" instruction
 - [DELETE]: remove the quoted text
 
 Output the complete revised document in full. Do not summarize or skip sections.

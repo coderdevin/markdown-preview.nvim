@@ -1037,31 +1037,109 @@ body {
   }
 
   // --- Storage ---
-  function storageKey() {
+  let activeStorageKey = '';
+
+  function getPreviewTitle() {
     try {
       const title = frame.contentDocument && frame.contentDocument.title;
-      if (title) return 'md-annotator:' + title;
+      if (title && title.trim()) return title.trim();
     } catch(e) {}
-    return 'md-annotator:' + urlInput.value.trim();
+    return '';
+  }
+
+  function storageKeys() {
+    const keys = [];
+    const title = getPreviewTitle();
+    if (title) {
+      keys.push('md-annotator:' + title);
+    }
+    const urlKey = 'md-annotator:' + urlInput.value.trim();
+    keys.push(urlKey);
+    return Array.from(new Set(keys.filter(Boolean)));
+  }
+
+  function serializeAnnotations(items) {
+    return items.map(a => ({
+      id: a.id,
+      type: a.type,
+      text: a.text,
+      note: a.note,
+      context: a.context
+    }));
+  }
+
+  function hydrateAnnotationIds(items) {
+    items.forEach(a => {
+      if (!a.id) a.id = 'ann-' + (++highlightCounter);
+    });
   }
 
   function saveAnnotations() {
     try {
-      const data = annotations.map(a => ({
-        id: a.id, type: a.type, text: a.text, note: a.note, context: a.context
-      }));
-      localStorage.setItem(storageKey(), JSON.stringify(data));
+      const keys = storageKeys();
+      const primaryKey = keys[0];
+      if (!primaryKey) return;
+      const data = serializeAnnotations(annotations);
+      localStorage.setItem(primaryKey, JSON.stringify(data));
+      activeStorageKey = primaryKey;
     } catch(e) {}
   }
 
   function loadAnnotations() {
     try {
-      const raw = localStorage.getItem(storageKey());
-      if (raw) {
-        annotations = JSON.parse(raw);
-        annotations.forEach(a => { if (!a.id) a.id = 'ann-' + (++highlightCounter); });
+      const keys = storageKeys();
+      if (!keys.length) return false;
+
+      const primaryKey = keys[0];
+      let matchedKey = '';
+      let loaded = [];
+
+      for (const key of keys) {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        try {
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) continue;
+          loaded = parsed;
+          matchedKey = key;
+          break;
+        } catch(_) {}
       }
-    } catch(e) { annotations = []; }
+
+      annotations = loaded;
+      hydrateAnnotationIds(annotations);
+
+      if (matchedKey && matchedKey !== primaryKey) {
+        localStorage.setItem(primaryKey, JSON.stringify(serializeAnnotations(annotations)));
+      }
+
+      activeStorageKey = primaryKey;
+      return true;
+    } catch(e) {
+      annotations = [];
+      return false;
+    }
+  }
+
+  function refreshAnnotationsFromStorage() {
+    const before = JSON.stringify(annotations);
+    const hadHighlights = (() => {
+      try {
+        const doc = frame.contentDocument;
+        return !!(doc && doc.querySelector('[data-ann-id]'));
+      } catch(_) {
+        return false;
+      }
+    })();
+
+    loadAnnotations();
+    const after = JSON.stringify(annotations);
+    if (before !== after) {
+      renderList();
+      if (!hadHighlights && annotations.length > 0) {
+        reapplyHighlights();
+      }
+    }
   }
 
   var lastCount = -1;
@@ -1486,8 +1564,9 @@ body {
 
   frame.addEventListener('load', () => {
     setupIframeListeners();
-    loadAnnotations();
-    renderList();
+    refreshAnnotationsFromStorage();
+    setTimeout(refreshAnnotationsFromStorage, 300);
+    setTimeout(refreshAnnotationsFromStorage, 1200);
     setTimeout(setupIframeListeners, 500);
     setTimeout(observeIframeChanges, 1000);
   });
@@ -1871,7 +1950,10 @@ body {
         doc.querySelectorAll('[data-ann-id]').forEach(el => unwrapMark(el));
       } catch(e) {}
       annotations = [];
-      localStorage.removeItem(storageKey());
+      storageKeys().forEach(key => localStorage.removeItem(key));
+      if (activeStorageKey) {
+        localStorage.removeItem(activeStorageKey);
+      }
       renderList();
       showToast('All annotations cleared');
     });

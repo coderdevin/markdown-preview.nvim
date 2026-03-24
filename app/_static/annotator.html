@@ -1752,8 +1752,8 @@ body {
   notePopoverSave.addEventListener('click', commitFromPopover);
 
   notePopoverInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitFromPopover(); }
-    if (e.key === 'Escape') closePopover();
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); commitFromPopover(); }
+    if (e.key === 'Escape' && !e.isComposing) closePopover();
   });
 
   // --- Render ---

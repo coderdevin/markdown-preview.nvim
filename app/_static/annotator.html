@@ -905,7 +905,7 @@ body {
         <span class="ann-count" id="annCount">0</span>
       </div>
       <div class="panel-actions">
-        <button class="btn-panel copy" id="copyAllBtn">Copy All Notes</button>
+        <button class="btn-panel copy" id="copyAllBtn">Copy All</button>
         <button class="btn-panel clear" id="clearAllBtn">Clear</button>
       </div>
     </div>
@@ -1184,8 +1184,8 @@ body {
     annCount.textContent = lastCount;
     annCount.classList.toggle('visible', lastCount > 0);
     copyAllBtn.textContent = lastCount > 0
-      ? 'Copy All Notes (' + lastCount + ')'
-      : 'Copy All Notes';
+      ? 'Copy All (' + lastCount + ')'
+      : 'Copy All';
   }
 
   // --- URL handling ---

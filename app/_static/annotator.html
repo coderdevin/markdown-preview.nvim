@@ -1033,10 +1033,12 @@ body {
 
       if (isPreviewFullWidth) {
         pageContainer.style.maxWidth = 'none';
-        pageContainer.style.width = '100%';
+        pageContainer.style.width = 'calc(100% - 56px)';
+        pageContainer.style.margin = '0 auto';
       } else {
         pageContainer.style.maxWidth = '';
         pageContainer.style.width = '';
+        pageContainer.style.margin = '';
       }
     } catch (_) {}
   }

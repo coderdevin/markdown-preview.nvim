@@ -874,8 +874,9 @@ body {
   <input type="text" id="urlInput" spellcheck="false" placeholder="Preview URL" aria-label="Preview URL">
   <span class="edit-counter" id="editCounter" aria-live="polite"></span>
   <div class="topbar-actions">
-    <button class="btn-ghost" id="toggleSourceBtn" title="Toggle source editor">Edit Source</button>
     <button class="btn-ghost" id="reloadBtn">Reload</button>
+    <button class="btn-ghost" id="toggleSourceBtn" title="Toggle source editor">Edit Source</button>
+    <button class="btn-ghost" id="toggleWidthBtn" title="Toggle preview content width">Full Width</button>
   </div>
 </div>
 
@@ -990,6 +991,7 @@ body {
   const saveSourceBtn = document.getElementById('saveSourceBtn');
   const reloadSourceBtn = document.getElementById('reloadSourceBtn');
   const toggleSourceBtn = document.getElementById('toggleSourceBtn');
+  const toggleWidthBtn = document.getElementById('toggleWidthBtn');
   const sourcePane = document.querySelector('.source-pane');
 
   toggleSourceBtn.addEventListener('click', function() {
@@ -1015,6 +1017,37 @@ body {
   let sourceContentSnapshot = '';
   let sourceAutoSaveTimer = null;
   let sourceSaving = false;
+  let isPreviewFullWidth = false;
+
+  function updateWidthButtonState() {
+    toggleWidthBtn.classList.toggle('active', isPreviewFullWidth);
+    toggleWidthBtn.textContent = isPreviewFullWidth ? 'Default Width' : 'Full Width';
+  }
+
+  function applyPreviewWidthMode() {
+    try {
+      const doc = frame.contentDocument;
+      if (!doc) return;
+      const pageContainer = doc.getElementById('page-ctn');
+      if (!pageContainer) return;
+
+      if (isPreviewFullWidth) {
+        pageContainer.style.maxWidth = 'none';
+        pageContainer.style.width = '100%';
+      } else {
+        pageContainer.style.maxWidth = '';
+        pageContainer.style.width = '';
+      }
+    } catch (_) {}
+  }
+
+  toggleWidthBtn.addEventListener('click', function() {
+    isPreviewFullWidth = !isPreviewFullWidth;
+    updateWidthButtonState();
+    applyPreviewWidthMode();
+  });
+
+  updateWidthButtonState();
 
   // --- Init from query params ---
   const params = new URLSearchParams(window.location.search);
@@ -1564,6 +1597,7 @@ body {
 
   frame.addEventListener('load', () => {
     setupIframeListeners();
+    applyPreviewWidthMode();
     refreshAnnotationsFromStorage();
     setTimeout(refreshAnnotationsFromStorage, 300);
     setTimeout(refreshAnnotationsFromStorage, 1200);
@@ -1648,11 +1682,15 @@ body {
   }
 
   var releasePopoverTrap = null;
+  var isComposingIME = false;
+  var imeComposeResetTimer = null;
 
   function closePopover() {
     noteOverlay.classList.remove('visible');
     notePopover.classList.remove('visible');
     if (releasePopoverTrap) { releasePopoverTrap(); releasePopoverTrap = null; }
+    isComposingIME = false;
+    if (imeComposeResetTimer) { clearTimeout(imeComposeResetTimer); imeComposeResetTimer = null; }
     editingAnnotationIdx = -1;
     currentSelection = null;
   }
@@ -1751,9 +1789,20 @@ body {
   notePopoverCancel.addEventListener('click', closePopover);
   notePopoverSave.addEventListener('click', commitFromPopover);
 
+  notePopoverInput.addEventListener('compositionstart', () => {
+    isComposingIME = true;
+    if (imeComposeResetTimer) { clearTimeout(imeComposeResetTimer); imeComposeResetTimer = null; }
+  });
+  notePopoverInput.addEventListener('compositionend', () => {
+    if (imeComposeResetTimer) clearTimeout(imeComposeResetTimer);
+    imeComposeResetTimer = setTimeout(() => {
+      isComposingIME = false;
+      imeComposeResetTimer = null;
+    }, 0);
+  });
   notePopoverInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); commitFromPopover(); }
-    if (e.key === 'Escape' && !e.isComposing) closePopover();
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !isComposingIME) { e.preventDefault(); commitFromPopover(); }
+    if (e.key === 'Escape' && !e.isComposing && !isComposingIME) closePopover();
   });
 
   // --- Render ---

@@ -27,6 +27,10 @@
   --danger-light: rgba(184, 84, 80, 0.08);
   --danger-wash: rgba(184, 84, 80, 0.12);
   --success: #5B8A5E;
+  --global: #7C6BBA;
+  --global-hover: #6B5AA8;
+  --global-light: rgba(124, 107, 186, 0.08);
+  --global-wash: rgba(124, 107, 186, 0.12);
   --radius: 10px;
   --radius-sm: 6px;
   --shadow-sm: 0 1px 3px rgba(45, 42, 38, 0.06);
@@ -650,6 +654,124 @@ body {
 .type-badge.modify { background: var(--accent-light); color: var(--accent); }
 .type-badge.add { background: rgba(91,138,94,0.1); color: var(--success); }
 .type-badge.delete { background: var(--danger-light); color: var(--danger); }
+.type-badge.global { background: var(--global-light); color: var(--global); }
+
+/* ── Global input area ── */
+.global-input-area {
+  padding: 12px 12px 0;
+  flex-shrink: 0;
+}
+
+.global-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.global-input-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.global-input-row input::placeholder { color: var(--text-tertiary); }
+.global-input-row input:focus { border-color: var(--global); }
+.global-input-row input:focus-visible {
+  border-color: var(--global);
+  box-shadow: 0 0 0 2px var(--global-wash);
+}
+
+.global-add-btn {
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--global);
+  color: var(--bg-surface);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition);
+  white-space: nowrap;
+}
+
+.global-add-btn:hover { background: var(--global-hover); }
+.global-add-btn:focus-visible { outline: 2px solid var(--global); outline-offset: 2px; }
+
+.global-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.global-presets.visible {
+  padding: 8px 0 4px;
+  height: auto;
+  opacity: 1;
+}
+
+.preset-chip {
+  padding: 6px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 99px;
+  background: var(--bg-surface);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.preset-chip:hover,
+.preset-chip:focus-visible {
+  border-color: var(--global);
+  color: var(--global);
+  background: var(--global-light);
+}
+
+.preset-chip:focus-visible {
+  outline: 2px solid var(--global);
+  outline-offset: 1px;
+}
+
+/* ── Global annotation item style ── */
+.ann-item[data-type="global"] {
+  border-left: 3px solid var(--global-wash);
+}
+
+.ann-item[data-type="global"] .snippet {
+  font-style: normal;
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+
+.ann-item[data-type="global"] .snippet::before,
+.ann-item[data-type="global"] .snippet::after { content: none; }
+
+.ann-item[data-type="global"] .note {
+  border-left-color: var(--global-wash);
+}
+
+.global-divider {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  padding: 8px 4px 4px;
+}
 
 /* ── Toolbar keyboard hints ── */
 .ann-toolbar .kbd-hint {
@@ -909,10 +1031,23 @@ body {
         <button class="btn-panel clear" id="clearAllBtn">Clear</button>
       </div>
     </div>
+    <div class="global-input-area" id="globalInputArea">
+      <div class="global-input-row">
+        <input type="text" id="globalNoteInput" placeholder="+ Document instruction..." aria-label="Add a document-level instruction" />
+        <button class="global-add-btn" id="globalAddBtn">Add</button>
+      </div>
+      <div class="global-presets" id="globalPresets">
+        <button class="preset-chip" data-preset="Translate this document to Chinese">Translate to Chinese</button>
+        <button class="preset-chip" data-preset="Fix all grammar and spelling errors">Fix grammar</button>
+        <button class="preset-chip" data-preset="Make the tone more concise and professional">Concise &amp; professional</button>
+        <button class="preset-chip" data-preset="Simplify for a general audience">Simplify</button>
+        <button class="preset-chip" data-preset="Add section headings where appropriate">Add headings</button>
+      </div>
+    </div>
     <div class="ann-list" id="annList">
       <div class="empty-state" id="emptyState">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-        <p>Select text in the preview, then press <kbd>M</kbd> to modify, <kbd>A</kbd> to add, or <kbd>D</kbd> to delete</p>
+        <p>Select text to annotate (<kbd>M</kbd> <kbd>A</kbd> <kbd>D</kbd>) or press <kbd>G</kbd> for a document instruction</p>
       </div>
     </div>
   </div>
@@ -966,6 +1101,8 @@ body {
   var TYPE_MODIFY = 'modify';
   var TYPE_ADD = 'add';
   var TYPE_DELETE = 'delete';
+  var TYPE_GLOBAL = 'global';
+  var COPY_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
 
   var HIGHLIGHT_CSS = [
     '.ann-highlight { background: rgba(196,112,75,0.14) !important; border-bottom: 2px solid rgba(196,112,75,0.5) !important; cursor: pointer !important; transition: background 0.15s ease !important; }',
@@ -993,6 +1130,9 @@ body {
   const toggleSourceBtn = document.getElementById('toggleSourceBtn');
   const toggleWidthBtn = document.getElementById('toggleWidthBtn');
   const sourcePane = document.querySelector('.source-pane');
+  const globalNoteInput = document.getElementById('globalNoteInput');
+  const globalAddBtn = document.getElementById('globalAddBtn');
+  const globalPresets = document.getElementById('globalPresets');
 
   toggleSourceBtn.addEventListener('click', function() {
     var isNowVisible = sourcePane.classList.toggle('visible');
@@ -1669,11 +1809,15 @@ body {
     if (!ann) return;
     editingAnnotationIdx = idx;
     var t = ann.type || TYPE_MODIFY;
-    notePopoverLabel.textContent = 'Edit note';
-    notePopoverInput.placeholder = t === TYPE_ADD ? 'What to add here?' : t === TYPE_DELETE ? 'Reason for deletion' : 'What should be changed?';
-    const truncated = ann.text.length > 120 ? ann.text.substring(0, 120) + '...' : ann.text;
-    notePopoverSelected.textContent = truncated;
-    notePopoverSelected.style.display = '';
+    notePopoverLabel.textContent = t === TYPE_GLOBAL ? 'Edit instruction' : 'Edit note';
+    notePopoverInput.placeholder = t === TYPE_GLOBAL ? 'Document instruction...' : t === TYPE_ADD ? 'What to add here?' : t === TYPE_DELETE ? 'Reason for deletion' : 'What should be changed?';
+    if (t === TYPE_GLOBAL) {
+      notePopoverSelected.style.display = 'none';
+    } else {
+      const truncated = ann.text.length > 120 ? ann.text.substring(0, 120) + '...' : ann.text;
+      notePopoverSelected.textContent = truncated;
+      notePopoverSelected.style.display = '';
+    }
     notePopoverInput.value = ann.note || '';
     const rect = anchorEl.getBoundingClientRect();
     positionPopover(rect.left, rect.bottom + 6);
@@ -1822,6 +1966,13 @@ body {
     annList.innerHTML = '';
 
     annotations.forEach((ann, idx) => {
+      if (idx > 0 && ann.type !== TYPE_GLOBAL && annotations[idx - 1].type === TYPE_GLOBAL) {
+        var divider = document.createElement('div');
+        divider.className = 'global-divider';
+        divider.textContent = 'Selection annotations';
+        annList.appendChild(divider);
+      }
+
       const item = document.createElement('div');
       item.className = 'ann-item';
       item.dataset.id = ann.id;
@@ -1829,19 +1980,24 @@ body {
 
       const annType = ann.type || TYPE_MODIFY;
       item.dataset.type = annType;
-      const truncText = ann.text.length > 100 ? ann.text.substring(0, 100) + '...' : ann.text;
-      const badgeClass = annType;
       const badgeLabel = annType.charAt(0).toUpperCase() + annType.slice(1);
-      const noteHtml = ann.note
-        ? `<div class="note"><span class="note-text">${escapeHtml(ann.note)}</span></div>`
-        : `<div class="add-note-hint">Click to add a note</div>`;
+
+      var bodyHtml;
+      if (annType === TYPE_GLOBAL) {
+        bodyHtml = `<div class="snippet"><span class="note-text">${escapeHtml(ann.note)}</span></div>`;
+      } else {
+        const truncText = ann.text.length > 100 ? ann.text.substring(0, 100) + '...' : ann.text;
+        bodyHtml = `<div class="snippet">${escapeHtml(truncText)}</div>`;
+        bodyHtml += ann.note
+          ? `<div class="note"><span class="note-text">${escapeHtml(ann.note)}</span></div>`
+          : `<div class="add-note-hint">Click to add a note</div>`;
+      }
 
       item.innerHTML = `
-        <button class="copy-btn" title="Copy" aria-label="Copy annotation"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+        <button class="copy-btn" title="Copy" aria-label="Copy annotation">${COPY_SVG}</button>
         <button class="remove-btn" data-idx="${idx}" title="Remove" aria-label="Remove annotation">&times;</button>
-        <span class="type-badge ${badgeClass}">${badgeLabel}</span>
-        <div class="snippet">${escapeHtml(truncText)}</div>
-        ${noteHtml}
+        <span class="type-badge ${annType}">${badgeLabel}</span>
+        ${bodyHtml}
       `;
 
       item.addEventListener('click', (e) => {
@@ -1852,7 +2008,7 @@ body {
           openPopoverForEdit(idx, item);
           return;
         }
-        scrollToAnnotation(ann.id);
+        if (annType !== TYPE_GLOBAL) scrollToAnnotation(ann.id);
       });
 
       item.querySelector('.remove-btn').addEventListener('click', (e) => {
@@ -1901,6 +2057,9 @@ body {
   // --- Copy helpers ---
   function formatAnnotation(ann) {
     const annType = (ann.type || TYPE_MODIFY).toUpperCase();
+    if (ann.type === TYPE_GLOBAL) {
+      return `[GLOBAL]\n**Instruction:** ${ann.note}\n`;
+    }
     const text = ann.text.replace(/\n/g, ' ');
     let md = `[${annType}]\n`;
     if (ann.type === TYPE_DELETE) {
@@ -1935,13 +2094,31 @@ body {
     try { title = frame.contentDocument.title || urlInput.value.trim(); }
     catch(e) { title = urlInput.value.trim(); }
 
+    var globalAnns = annotations.filter(a => a.type === TYPE_GLOBAL);
+    var selectionAnns = annotations.filter(a => a.type !== TYPE_GLOBAL);
+
     let md = `# Document Review: ${title}\n\n`;
-    md += `## Annotations\n\n`;
-    annotations.forEach((ann, i) => {
-      md += `### ${i + 1}. ${formatAnnotation(ann)}\n`;
-    });
+
+    if (globalAnns.length > 0) {
+      md += `## Document Instructions\n\n`;
+      globalAnns.forEach((ann, i) => {
+        md += `${i + 1}. ${ann.note}\n`;
+      });
+      md += `\n`;
+    }
+
+    if (selectionAnns.length > 0) {
+      md += `## Annotations\n\n`;
+      selectionAnns.forEach((ann, i) => {
+        md += `### ${i + 1}. ${formatAnnotation(ann)}\n`;
+      });
+    }
+
     md += `---\n\n`;
-    md += `Apply all annotations above to the original document:\n`;
+    md += `Apply all instructions and annotations above to the original document:\n`;
+    if (globalAnns.length > 0) {
+      md += `- Document Instructions: apply each instruction to the entire document\n`;
+    }
     md += `- [MODIFY]: rewrite the quoted text according to the "Change to" instruction\n`;
     md += `- [ADD]: write the new content according to the "Add" instruction\n`;
     md += `- [DELETE]: remove the quoted text\n`;
@@ -2011,6 +2188,57 @@ body {
   });
 
   document.addEventListener('mousedown', () => { hideToolbar(); });
+
+  // --- Global document instructions ---
+  function addGlobalNote(note) {
+    var trimmed = (note || '').trim();
+    if (!trimmed) return;
+    const id = 'ann-' + (++highlightCounter);
+    const ann = { id: id, type: TYPE_GLOBAL, text: '', note: trimmed, context: trimmed.substring(0, 60) };
+    var insertIdx = 0;
+    for (var i = 0; i < annotations.length; i++) {
+      if (annotations[i].type === TYPE_GLOBAL) insertIdx = i + 1;
+      else break;
+    }
+    annotations.splice(insertIdx, 0, ann);
+    saveAnnotations();
+    renderList();
+    globalNoteInput.value = '';
+    globalPresets.classList.remove('visible');
+    showToast('Instruction added');
+  }
+
+  globalAddBtn.addEventListener('click', () => addGlobalNote(globalNoteInput.value));
+
+  globalNoteInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addGlobalNote(globalNoteInput.value); }
+    if (e.key === 'Escape') { globalNoteInput.blur(); globalPresets.classList.remove('visible'); }
+  });
+
+  globalNoteInput.addEventListener('focus', () => { globalPresets.classList.add('visible'); });
+  globalNoteInput.addEventListener('blur', (e) => {
+    var area = document.getElementById('globalInputArea');
+    if (e.relatedTarget && area.contains(e.relatedTarget)) return;
+    globalPresets.classList.remove('visible');
+  });
+
+  globalPresets.querySelectorAll('.preset-chip').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      e.preventDefault();
+      addGlobalNote(chip.dataset.preset);
+    });
+  });
+
+  // G key to focus global input (when no toolbar visible and no active selection)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'g' || e.key === 'G') {
+      if (toolbar.classList.contains('visible')) return;
+      if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+      if (notePopover.classList.contains('visible') || confirmOverlay.classList.contains('visible')) return;
+      e.preventDefault();
+      globalNoteInput.focus();
+    }
+  });
 
   function observeIframeChanges() {
     try {

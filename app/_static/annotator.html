@@ -656,69 +656,94 @@ body {
 .type-badge.delete { background: var(--danger-light); color: var(--danger); }
 .type-badge.global { background: var(--global-light); color: var(--global); }
 
-/* ── Global input area ── */
-.global-input-area {
-  padding: 12px 12px 0;
+/* ── Global instruction trigger ── */
+.global-instruction-trigger {
+  padding: 8px 12px;
   flex-shrink: 0;
 }
 
-.global-input-row {
-  display: flex;
-  gap: 6px;
+.global-instruction-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--global);
+  cursor: pointer;
+  transition: color var(--transition);
 }
 
-.global-input-row input {
-  flex: 1;
-  min-width: 0;
-  padding: 8px 12px;
+.global-instruction-btn:hover { color: var(--global-hover); }
+.global-instruction-btn:focus-visible { outline: 2px solid var(--global); outline-offset: 2px; border-radius: 2px; }
+
+/* ── Global instruction modal ── */
+.global-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 9998;
+}
+.global-modal-overlay.visible { display: block; }
+
+.global-modal {
+  display: none;
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 40px));
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.18);
+  z-index: 9999;
+  padding: 20px;
+  font-family: var(--font-ui);
+}
+.global-modal.visible { display: block; }
+
+.global-modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.global-modal textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 10px 12px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   background: var(--bg);
   font-family: var(--font-ui);
   font-size: 13px;
   color: var(--text);
+  resize: vertical;
   transition: border-color var(--transition), box-shadow var(--transition);
+  box-sizing: border-box;
 }
-
-.global-input-row input::placeholder { color: var(--text-tertiary); }
-.global-input-row input:focus { border-color: var(--global); }
-.global-input-row input:focus-visible {
+.global-modal textarea:focus {
   border-color: var(--global);
   box-shadow: 0 0 0 2px var(--global-wash);
+  outline: none;
 }
+.global-modal textarea::placeholder { color: var(--text-tertiary); }
 
-.global-add-btn {
-  padding: 0 14px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: var(--global);
-  color: var(--bg-surface);
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background var(--transition);
-  white-space: nowrap;
-}
-
-.global-add-btn:hover { background: var(--global-hover); }
-.global-add-btn:focus-visible { outline: 2px solid var(--global); outline-offset: 2px; }
-
-.global-presets {
+.global-modal-presets {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  padding: 0;
-  height: 0;
-  overflow: hidden;
-  opacity: 0;
-  transition: opacity 200ms ease;
+  padding: 10px 0 0;
 }
 
-.global-presets.visible {
-  padding: 8px 0 4px;
-  height: auto;
-  opacity: 1;
+.global-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
 }
 
 .preset-chip {
@@ -1031,18 +1056,8 @@ body {
         <button class="btn-panel clear" id="clearAllBtn">Clear</button>
       </div>
     </div>
-    <div class="global-input-area" id="globalInputArea">
-      <div class="global-input-row">
-        <input type="text" id="globalNoteInput" placeholder="+ Document instruction..." aria-label="Add a document-level instruction" />
-        <button class="global-add-btn" id="globalAddBtn">Add</button>
-      </div>
-      <div class="global-presets" id="globalPresets">
-        <button class="preset-chip" data-preset="Translate this document to Chinese">Translate to Chinese</button>
-        <button class="preset-chip" data-preset="Fix all grammar and spelling errors">Fix grammar</button>
-        <button class="preset-chip" data-preset="Make the tone more concise and professional">Concise &amp; professional</button>
-        <button class="preset-chip" data-preset="Simplify for a general audience">Simplify</button>
-        <button class="preset-chip" data-preset="Add section headings where appropriate">Add headings</button>
-      </div>
+    <div class="global-instruction-trigger">
+      <button class="global-instruction-btn" id="globalInstructionBtn">+ Document Instruction</button>
     </div>
     <div class="ann-list" id="annList">
       <div class="empty-state" id="emptyState">
@@ -1061,6 +1076,23 @@ body {
   <div class="note-popover-actions">
     <button class="btn-cancel" id="notePopoverCancel">Cancel</button>
     <button class="btn-save" id="notePopoverSave">Save</button>
+  </div>
+</div>
+
+<div class="global-modal-overlay" id="globalModalOverlay"></div>
+<div class="global-modal" id="globalModal" role="dialog" aria-modal="true">
+  <div class="global-modal-title">Document Instruction</div>
+  <textarea id="globalModalInput" rows="3" placeholder="Enter an instruction to apply to the entire document..."></textarea>
+  <div class="global-modal-presets">
+    <button class="preset-chip" data-preset="Translate this document to Chinese">Translate to Chinese</button>
+    <button class="preset-chip" data-preset="Fix all grammar and spelling errors">Fix grammar</button>
+    <button class="preset-chip" data-preset="Make the tone more concise and professional">Concise &amp; professional</button>
+    <button class="preset-chip" data-preset="Simplify for a general audience">Simplify</button>
+    <button class="preset-chip" data-preset="Add section headings where appropriate">Add headings</button>
+  </div>
+  <div class="global-modal-actions">
+    <button class="btn-cancel" id="globalModalCancel">Cancel</button>
+    <button class="btn-save" id="globalModalSave">Add</button>
   </div>
 </div>
 
@@ -1130,9 +1162,13 @@ body {
   const toggleSourceBtn = document.getElementById('toggleSourceBtn');
   const toggleWidthBtn = document.getElementById('toggleWidthBtn');
   const sourcePane = document.querySelector('.source-pane');
-  const globalNoteInput = document.getElementById('globalNoteInput');
-  const globalAddBtn = document.getElementById('globalAddBtn');
-  const globalPresets = document.getElementById('globalPresets');
+  const globalInstructionBtn = document.getElementById('globalInstructionBtn');
+  const globalModal = document.getElementById('globalModal');
+  const globalModalOverlay = document.getElementById('globalModalOverlay');
+  const globalModalInput = document.getElementById('globalModalInput');
+  const globalModalCancel = document.getElementById('globalModalCancel');
+  const globalModalSave = document.getElementById('globalModalSave');
+  const globalModalPresets = globalModal.querySelector('.global-modal-presets');
 
   toggleSourceBtn.addEventListener('click', function() {
     var isNowVisible = sourcePane.classList.toggle('visible');
@@ -2189,7 +2225,19 @@ body {
 
   document.addEventListener('mousedown', () => { hideToolbar(); });
 
-  // --- Global document instructions ---
+  // --- Global document instructions (modal) ---
+  function openGlobalModal() {
+    globalModalInput.value = '';
+    globalModal.classList.add('visible');
+    globalModalOverlay.classList.add('visible');
+    setTimeout(() => globalModalInput.focus(), 50);
+  }
+
+  function closeGlobalModal() {
+    globalModal.classList.remove('visible');
+    globalModalOverlay.classList.remove('visible');
+  }
+
   function addGlobalNote(note) {
     var trimmed = (note || '').trim();
     if (!trimmed) return;
@@ -2203,40 +2251,36 @@ body {
     annotations.splice(insertIdx, 0, ann);
     saveAnnotations();
     renderList();
-    globalNoteInput.value = '';
-    globalPresets.classList.remove('visible');
+    closeGlobalModal();
     showToast('Instruction added');
   }
 
-  globalAddBtn.addEventListener('click', () => addGlobalNote(globalNoteInput.value));
+  globalInstructionBtn.addEventListener('click', openGlobalModal);
+  globalModalOverlay.addEventListener('click', closeGlobalModal);
+  globalModalCancel.addEventListener('click', closeGlobalModal);
+  globalModalSave.addEventListener('click', () => addGlobalNote(globalModalInput.value));
 
-  globalNoteInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addGlobalNote(globalNoteInput.value); }
-    if (e.key === 'Escape') { globalNoteInput.blur(); globalPresets.classList.remove('visible'); }
+  globalModalInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); addGlobalNote(globalModalInput.value); }
+    if (e.key === 'Escape') { closeGlobalModal(); }
   });
 
-  globalNoteInput.addEventListener('focus', () => { globalPresets.classList.add('visible'); });
-  globalNoteInput.addEventListener('blur', (e) => {
-    var area = document.getElementById('globalInputArea');
-    if (e.relatedTarget && area.contains(e.relatedTarget)) return;
-    globalPresets.classList.remove('visible');
-  });
-
-  globalPresets.querySelectorAll('.preset-chip').forEach(chip => {
+  globalModalPresets.querySelectorAll('.preset-chip').forEach(chip => {
     chip.addEventListener('click', (e) => {
       e.preventDefault();
       addGlobalNote(chip.dataset.preset);
     });
   });
 
-  // G key to focus global input (when no toolbar visible and no active selection)
+  // G key to open global instruction modal
   document.addEventListener('keydown', (e) => {
     if (e.key === 'g' || e.key === 'G') {
       if (toolbar.classList.contains('visible')) return;
       if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
       if (notePopover.classList.contains('visible') || confirmOverlay.classList.contains('visible')) return;
+      if (globalModal.classList.contains('visible')) return;
       e.preventDefault();
-      globalNoteInput.focus();
+      openGlobalModal();
     }
   });
 

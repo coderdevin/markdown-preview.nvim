@@ -85,8 +85,28 @@ exports.run = function () {
       const pageTitle = await plugin.nvim.getVar('mkdp_page_title')
       const theme = await plugin.nvim.getVar('mkdp_theme')
       const name = await buffer.name
-      const content = await buffer.getLines()
+      let content = await buffer.getLines()
       const currentBuffer = await plugin.nvim.buffer
+
+      // Convert YAML frontmatter to a fenced code block for better rendering
+      if (content.length > 0 && content[0].trim() === '---') {
+        let endIdx = -1
+        for (let i = 1; i < content.length; i++) {
+          if (content[i].trim() === '---' || content[i].trim() === '...') {
+            endIdx = i
+            break
+          }
+        }
+        if (endIdx > 0) {
+          content = [
+            '```yaml',
+            ...content.slice(1, endIdx),
+            '```',
+            ...content.slice(endIdx + 1)
+          ]
+        }
+      }
+
       return {
         options,
         isActive: currentBuffer.id === buffer.id,

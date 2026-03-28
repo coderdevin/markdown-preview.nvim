@@ -307,13 +307,12 @@ exports.run = function () {
           reply({ ok: false, error: 'filePath required' })
           return
         }
-        await plugin.nvim.command('badd ' + filePath.replace(/ /g, '\\ '))
-        const newBufnr = await plugin.nvim.call('bufnr', filePath)
+        const newBufnr = await plugin.nvim.call('bufadd', filePath)
         if (!newBufnr || newBufnr < 1) {
           reply({ ok: false, error: 'failed to open buffer' })
           return
         }
-        await plugin.nvim.command('bufload ' + newBufnr)
+        await plugin.nvim.call('bufload', newBufnr)
         reply({ ok: true, bufnr: newBufnr })
       } catch (e) {
         logger.error('open_md_file error: ', e)

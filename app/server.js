@@ -293,6 +293,7 @@ exports.run = function () {
           reply({ ok: false, error: 'failed to open buffer' })
           return
         }
+        await plugin.nvim.command('bufload ' + newBufnr)
         reply({ ok: true, bufnr: newBufnr })
       } catch (e) {
         logger.error('open_md_file error: ', e)

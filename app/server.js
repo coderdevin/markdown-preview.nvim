@@ -74,6 +74,17 @@ exports.run = function () {
       return buffers.find(b => b.id === Number(targetBufnr))
     }
 
+    function convertFrontmatter (lines) {
+      if (lines.length > 0 && lines[0].trim() === '---') {
+        for (let i = 1; i < lines.length; i++) {
+          if (lines[i].trim() === '---' || lines[i].trim() === '...') {
+            return ['```yaml', ...lines.slice(1, i), '```', ...lines.slice(i + 1)]
+          }
+        }
+      }
+      return lines
+    }
+
     const buildRefreshData = async (targetBufnr) => {
       const buffer = await loadBufferById(targetBufnr)
       if (!buffer) return null
@@ -92,25 +103,7 @@ exports.run = function () {
       const theme = await plugin.nvim.getVar('mkdp_theme')
       const name = await buffer.name
       const currentBuffer = await plugin.nvim.buffer
-
-      // Convert YAML frontmatter to a fenced code block for better rendering
-      if (content.length > 0 && content[0].trim() === '---') {
-        let endIdx = -1
-        for (let i = 1; i < content.length; i++) {
-          if (content[i].trim() === '---' || content[i].trim() === '...') {
-            endIdx = i
-            break
-          }
-        }
-        if (endIdx > 0) {
-          content = [
-            '```yaml',
-            ...content.slice(1, endIdx),
-            '```',
-            ...content.slice(endIdx + 1)
-          ]
-        }
-      }
+      content = convertFrontmatter(content)
 
       return {
         options,
@@ -319,26 +312,6 @@ exports.run = function () {
       }
     })
 
-    client.on('open_md_file', async ({ filePath }, done) => {
-      const reply = safeReply(done)
-      try {
-        if (!filePath || typeof filePath !== 'string') {
-          reply({ ok: false, error: 'filePath required' })
-          return
-        }
-        const newBufnr = await plugin.nvim.call('bufadd', filePath)
-        if (!newBufnr || newBufnr < 1) {
-          reply({ ok: false, error: 'failed to open buffer' })
-          return
-        }
-        await plugin.nvim.call('bufload', newBufnr)
-        reply({ ok: true, bufnr: newBufnr })
-      } catch (e) {
-        logger.error('open_md_file error: ', e)
-        reply({ ok: false, error: String((e && e.message) || e) })
-      }
-    })
-
     client.on('preview_file', async ({ filePath }, done) => {
       const reply = safeReply(done)
       try {
@@ -346,31 +319,17 @@ exports.run = function () {
           reply({ ok: false, error: 'filePath required' })
           return
         }
-        const raw = await fs.promises.readFile(filePath, 'utf-8')
-        let content = raw.split(/\r?\n/)
-
-        // Convert YAML frontmatter to a fenced code block
-        if (content.length > 0 && content[0].trim() === '---') {
-          let endIdx = -1
-          for (let i = 1; i < content.length; i++) {
-            if (content[i].trim() === '---' || content[i].trim() === '...') {
-              endIdx = i
-              break
-            }
-          }
-          if (endIdx > 0) {
-            content = [
-              '```yaml',
-              ...content.slice(1, endIdx),
-              '```',
-              ...content.slice(endIdx + 1)
-            ]
-          }
+        if (!path.isAbsolute(filePath) || !(/\.(md|markdown)$/i.test(filePath))) {
+          reply({ ok: false, error: 'invalid file path' })
+          return
         }
+        const content = convertFrontmatter((await fs.promises.readFile(filePath, 'utf-8')).split(/\r?\n/))
 
-        const options = await plugin.nvim.getVar('mkdp_preview_options')
-        const pageTitle = await plugin.nvim.getVar('mkdp_page_title')
-        const theme = await plugin.nvim.getVar('mkdp_theme')
+        const [options, pageTitle, theme] = await Promise.all([
+          plugin.nvim.getVar('mkdp_preview_options'),
+          plugin.nvim.getVar('mkdp_page_title'),
+          plugin.nvim.getVar('mkdp_theme')
+        ])
 
         client.emit('refresh_content', {
           options,

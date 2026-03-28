@@ -14,6 +14,7 @@ exports.run = function () {
   const routes = require('./routes')
 
   const safeReply = (done) => typeof done === 'function' ? done : () => {}
+  const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
   let clients = {}
 
@@ -138,7 +139,21 @@ exports.run = function () {
       return true
     }
 
-    await emitRefreshContent(Number(bufnr), client)
+    const emitRefreshContentWithRetry = async (targetBufnr, targetClient, maxAttempts = 8, delayMs = 80) => {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const emitted = await emitRefreshContent(targetBufnr, targetClient)
+        if (emitted) {
+          return true
+        }
+        if (attempt < maxAttempts) {
+          await wait(delayMs)
+        }
+      }
+      logger.warn('refresh_content unavailable after retries: ', targetBufnr)
+      return false
+    }
+
+    await emitRefreshContentWithRetry(Number(bufnr), client)
 
     client.on('update_lines', async ({ bufnr: updateBufnr, changes }, done) => {
       const reply = safeReply(done)

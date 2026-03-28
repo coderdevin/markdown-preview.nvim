@@ -339,6 +339,57 @@ exports.run = function () {
       }
     })
 
+    client.on('preview_file', async ({ filePath }, done) => {
+      const reply = safeReply(done)
+      try {
+        if (!filePath || typeof filePath !== 'string') {
+          reply({ ok: false, error: 'filePath required' })
+          return
+        }
+        const raw = await fs.promises.readFile(filePath, 'utf-8')
+        let content = raw.split(/\r?\n/)
+
+        // Convert YAML frontmatter to a fenced code block
+        if (content.length > 0 && content[0].trim() === '---') {
+          let endIdx = -1
+          for (let i = 1; i < content.length; i++) {
+            if (content[i].trim() === '---' || content[i].trim() === '...') {
+              endIdx = i
+              break
+            }
+          }
+          if (endIdx > 0) {
+            content = [
+              '```yaml',
+              ...content.slice(1, endIdx),
+              '```',
+              ...content.slice(endIdx + 1)
+            ]
+          }
+        }
+
+        const options = await plugin.nvim.getVar('mkdp_preview_options')
+        const pageTitle = await plugin.nvim.getVar('mkdp_page_title')
+        const theme = await plugin.nvim.getVar('mkdp_theme')
+
+        client.emit('refresh_content', {
+          options,
+          isActive: true,
+          winline: 0,
+          winheight: 50,
+          cursor: [0, 1, 1, 0],
+          pageTitle,
+          theme,
+          name: filePath,
+          content
+        })
+        reply({ ok: true })
+      } catch (e) {
+        logger.error('preview_file error: ', e)
+        reply({ ok: false, error: String((e && e.message) || e) })
+      }
+    })
+
     client.on('disconnect', function () {
       logger.info('disconnect: ', client.id)
       clients[bufnr] = (clients[bufnr] || []).filter(c => c.id !== client.id)

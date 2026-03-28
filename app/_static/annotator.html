@@ -1430,21 +1430,20 @@ body {
       showToast('Preview not connected');
       return;
     }
-    sock.emit('open_md_file', { filePath: filePath }, function(result) {
+    saveAnnotations();
+    currentFilePath = filePath;
+
+    sock.emit('preview_file', { filePath: filePath }, function(result) {
       if (!result || !result.ok) {
         showToast('Failed to open file');
         return;
       }
-      saveAnnotations();
-
-      bufnr = String(result.bufnr);
-      currentFilePath = filePath;
-      navigateToPreviewBufnr(bufnr);
 
       fileTreeList.querySelectorAll('.tree-item.current').forEach(function(el) {
         el.classList.remove('current');
       });
       clickedEl.classList.add('current');
+      urlInput.value = filePath;
 
       sourceContentSnapshot = '';
       if (sourcePane.classList.contains('visible')) {

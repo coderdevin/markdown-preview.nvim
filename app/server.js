@@ -78,6 +78,11 @@ exports.run = function () {
       const buffer = await loadBufferById(targetBufnr)
       if (!buffer) return null
 
+      let content = await buffer.getLines()
+      if (!content || content.length === 0 || (content.length === 1 && content[0] === '')) {
+        return null
+      }
+
       const winline = await plugin.nvim.call('winline')
       const currentWindow = await plugin.nvim.window
       const winheight = await plugin.nvim.call('winheight', currentWindow.id)
@@ -86,7 +91,6 @@ exports.run = function () {
       const pageTitle = await plugin.nvim.getVar('mkdp_page_title')
       const theme = await plugin.nvim.getVar('mkdp_theme')
       const name = await buffer.name
-      let content = await buffer.getLines()
       const currentBuffer = await plugin.nvim.buffer
 
       // Convert YAML frontmatter to a fenced code block for better rendering

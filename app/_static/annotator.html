@@ -1439,9 +1439,7 @@ body {
 
       bufnr = String(result.bufnr);
       currentFilePath = filePath;
-      var previewPath = '/page/' + bufnr;
-      frame.src = previewPath;
-      urlInput.value = window.location.origin + previewPath;
+      navigateToPreviewBufnr(bufnr);
 
       fileTreeList.querySelectorAll('.tree-item.current').forEach(function(el) {
         el.classList.remove('current');
@@ -1604,6 +1602,15 @@ body {
 
   function setSourceStatus(msg) {
     sourceStatusEl.textContent = msg;
+  }
+
+  function navigateToPreviewBufnr(nextBufnr) {
+    var previewPath = '/page/' + nextBufnr;
+    frame.src = '';
+    setTimeout(function() {
+      frame.src = previewPath;
+    }, 0);
+    urlInput.value = window.location.origin + previewPath;
   }
 
   function getPreviewSocket() {

@@ -5,12 +5,15 @@ exports.run = function () {
   const websocket = require('socket.io')
 
   const fs = require('fs')
+  const path = require('path')
   const opener = require('./lib/util/opener')
   const logger = require('./lib/util/logger')('app/server')
   const { applyInlineChangesToContent } = require('./lib/util/applyInlineChanges')
   const { resolveBufferPath } = require('./lib/util/resolveBufferPath')
   const { getIP } = require('./lib/util/getIP')
   const routes = require('./routes')
+
+  const safeReply = (done) => typeof done === 'function' ? done : () => {}
 
   let clients = {}
 
@@ -118,7 +121,7 @@ exports.run = function () {
     await emitRefreshContent(Number(bufnr), client)
 
     client.on('update_lines', async ({ bufnr: updateBufnr, changes }, done) => {
-      const reply = typeof done === 'function' ? done : function () {}
+      const reply = safeReply(done)
       try {
         const targetBufnr = Number(updateBufnr || bufnr)
         const buffer = await loadBufferById(targetBufnr)
@@ -159,7 +162,7 @@ exports.run = function () {
     })
 
     client.on('read_source', async ({ bufnr: updateBufnr }, done) => {
-      const reply = typeof done === 'function' ? done : function () {}
+      const reply = safeReply(done)
       try {
         const targetBufnr = Number(updateBufnr || bufnr)
         const buffer = await loadBufferById(targetBufnr)
@@ -189,7 +192,7 @@ exports.run = function () {
     })
 
     client.on('write_source', async ({ bufnr: updateBufnr, content }, done) => {
-      const reply = typeof done === 'function' ? done : function () {}
+      const reply = safeReply(done)
       try {
         const targetBufnr = Number(updateBufnr || bufnr)
         const buffer = await loadBufferById(targetBufnr)
@@ -222,6 +225,77 @@ exports.run = function () {
         emitRefreshContent(targetBufnr)
       } catch (e) {
         logger.error('write_source error: ', e)
+        reply({ ok: false, error: String((e && e.message) || e) })
+      }
+    })
+
+    client.on('list_md_tree', async ({ bufnr: queryBufnr }, done) => {
+      const reply = safeReply(done)
+      try {
+        const targetBufnr = Number(queryBufnr || bufnr)
+        const buffer = await loadBufferById(targetBufnr)
+        if (!buffer) {
+          reply({ ok: false, error: 'buffer not found' })
+          return
+        }
+
+        const filePath = await buffer.name
+        const nvimCwd = await plugin.nvim.call('getcwd')
+        const resolvedFilePath = resolveBufferPath(filePath, nvimCwd)
+        const rootDir = path.dirname(resolvedFilePath)
+
+        async function scanDir (dir) {
+          const entries = await fs.promises.readdir(dir, { withFileTypes: true })
+          const children = []
+          for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+            if (entry.name.startsWith('.')) continue
+            const fullPath = path.join(dir, entry.name)
+            if (entry.isDirectory()) {
+              const sub = await scanDir(fullPath)
+              if (sub.children.length > 0) {
+                children.push(sub)
+              }
+            } else if (/\.(md|markdown)$/i.test(entry.name)) {
+              children.push({
+                name: entry.name,
+                path: fullPath,
+                type: 'file',
+                isCurrent: fullPath === resolvedFilePath
+              })
+            }
+          }
+          return {
+            name: path.basename(dir),
+            path: dir,
+            type: 'dir',
+            children
+          }
+        }
+
+        const tree = await scanDir(rootDir)
+        reply({ ok: true, tree, rootPath: rootDir })
+      } catch (e) {
+        logger.error('list_md_tree error: ', e)
+        reply({ ok: false, error: String((e && e.message) || e) })
+      }
+    })
+
+    client.on('open_md_file', async ({ filePath }, done) => {
+      const reply = safeReply(done)
+      try {
+        if (!filePath || typeof filePath !== 'string') {
+          reply({ ok: false, error: 'filePath required' })
+          return
+        }
+        await plugin.nvim.command('badd ' + filePath.replace(/ /g, '\\ '))
+        const newBufnr = await plugin.nvim.call('bufnr', filePath)
+        if (!newBufnr || newBufnr < 1) {
+          reply({ ok: false, error: 'failed to open buffer' })
+          return
+        }
+        reply({ ok: true, bufnr: newBufnr })
+      } catch (e) {
+        logger.error('open_md_file error: ', e)
         reply({ ok: false, error: String((e && e.message) || e) })
       }
     })

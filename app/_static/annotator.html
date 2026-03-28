@@ -1008,6 +1008,74 @@ body {
   .ann-item .copy-btn { width: 44px; height: 44px; top: 2px; right: 46px; opacity: 1; }
   .ann-toolbar button { min-height: 44px; padding: 10px 16px; }
 }
+
+/* ── File Tree Panel ── */
+.file-tree-panel {
+  display: none;
+  width: 260px;
+  min-width: 260px;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+.file-tree-panel.visible { display: flex; flex-direction: column; }
+.file-tree-header {
+  padding: 12px 14px 8px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-tree-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+.tree-item {
+  display: flex;
+  align-items: center;
+  padding: 5px 10px;
+  cursor: pointer;
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background var(--transition);
+  border-radius: 4px;
+  margin: 1px 6px;
+}
+.tree-item:hover { background: var(--bg-hover); }
+.tree-item.current { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+.tree-item.dir { font-weight: 500; color: var(--text-secondary); }
+.tree-item-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+.tree-item.current .tree-item-icon { opacity: 1; }
+.tree-children { display: block; }
+.tree-children.collapsed { display: none; }
+.tree-indent { display: inline-block; width: 16px; flex-shrink: 0; }
+.file-tree-loading {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
 </style>
 </head>
 <body>
@@ -1021,6 +1089,10 @@ body {
   <input type="text" id="urlInput" spellcheck="false" placeholder="Preview URL" aria-label="Preview URL">
   <span class="edit-counter" id="editCounter" aria-live="polite"></span>
   <div class="topbar-actions">
+    <button class="btn-ghost" id="toggleTreeBtn" title="Toggle file browser (F)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px" aria-hidden="true"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      Files
+    </button>
     <button class="btn-ghost" id="reloadBtn">Reload</button>
     <button class="btn-ghost" id="toggleSourceBtn" title="Toggle source editor">Edit Source</button>
     <button class="btn-ghost" id="toggleWidthBtn" title="Toggle preview content width">Full Width</button>
@@ -1028,6 +1100,12 @@ body {
 </div>
 
 <div class="main">
+  <div class="file-tree-panel" id="fileTreePanel">
+    <div class="file-tree-header" id="fileTreeHeader">Files</div>
+    <div class="file-tree-list" id="fileTreeList">
+      <div class="file-tree-loading">Loading...</div>
+    </div>
+  </div>
   <div class="preview-area">
     <div class="source-pane">
       <div class="source-header">
@@ -1161,6 +1239,10 @@ body {
   const reloadSourceBtn = document.getElementById('reloadSourceBtn');
   const toggleSourceBtn = document.getElementById('toggleSourceBtn');
   const toggleWidthBtn = document.getElementById('toggleWidthBtn');
+  const toggleTreeBtn = document.getElementById('toggleTreeBtn');
+  const fileTreePanel = document.getElementById('fileTreePanel');
+  const fileTreeList = document.getElementById('fileTreeList');
+  const fileTreeHeader = document.getElementById('fileTreeHeader');
   const sourcePane = document.querySelector('.source-pane');
   const globalInstructionBtn = document.getElementById('globalInstructionBtn');
   const globalModal = document.getElementById('globalModal');
@@ -1227,9 +1309,156 @@ body {
 
   updateWidthButtonState();
 
+  // --- File Tree ---
+  var fileTreeLoaded = false;
+  var fileTreeRetryTimer = null;
+  var currentFilePath = '';
+
+  function toggleFileTree() {
+    var isNowVisible = fileTreePanel.classList.toggle('visible');
+    toggleTreeBtn.classList.toggle('active');
+    if (isNowVisible) {
+      if (!fileTreeLoaded) loadFileTree();
+    } else if (fileTreeRetryTimer) {
+      clearTimeout(fileTreeRetryTimer);
+      fileTreeRetryTimer = null;
+    }
+  }
+
+  toggleTreeBtn.addEventListener('click', toggleFileTree);
+
+  function loadFileTree() {
+    var sock = getPreviewSocket();
+    if (!sock) {
+      fileTreeList.innerHTML = '<div class="file-tree-loading">Waiting for preview...</div>';
+      fileTreeRetryTimer = setTimeout(loadFileTree, 1000);
+      return;
+    }
+    fileTreeList.innerHTML = '<div class="file-tree-loading">Loading...</div>';
+    sock.emit('list_md_tree', { bufnr: bufnr }, function(result) {
+      if (!result || !result.ok) {
+        fileTreeList.innerHTML = '<div class="file-tree-loading">Failed to load files</div>';
+        return;
+      }
+      fileTreeLoaded = true;
+      fileTreeRetryTimer = null;
+      fileTreeHeader.textContent = result.tree.name;
+      // Set currentFilePath from the tree's isCurrent marker
+      (function findCurrent(n) {
+        if (n.isCurrent) { currentFilePath = n.path; return; }
+        (n.children || []).forEach(findCurrent);
+      })(result.tree);
+      renderTree(result.tree, fileTreeList);
+    });
+  }
+
+  var folderSvg = '<svg class="tree-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
+  var fileSvg = '<svg class="tree-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+
+  function subtreeHasCurrent(n) {
+    if (n.isCurrent) return true;
+    return (n.children || []).some(subtreeHasCurrent);
+  }
+
+  function sortedChildren(node) {
+    var ch = node.children || [];
+    var dirs = ch.filter(function(c) { return c.type === 'dir'; });
+    var files = ch.filter(function(c) { return c.type === 'file'; });
+    return dirs.concat(files);
+  }
+
+  function appendIndents(el, depth) {
+    for (var i = 0; i < depth; i++) {
+      var s = document.createElement('span');
+      s.className = 'tree-indent';
+      el.appendChild(s);
+    }
+  }
+
+  function renderTree(node, container) {
+    container.innerHTML = '';
+    if (node.type === 'dir' && node.children) {
+      sortedChildren(node).forEach(function(child) {
+        renderNode(child, container, 0);
+      });
+    }
+  }
+
+  function renderNode(node, container, depth) {
+    if (node.type === 'dir') {
+      var dirEl = document.createElement('div');
+      dirEl.className = 'tree-item dir';
+      appendIndents(dirEl, depth);
+      dirEl.insertAdjacentHTML('beforeend', folderSvg);
+      var nameSpan = document.createElement('span');
+      nameSpan.textContent = node.name;
+      dirEl.appendChild(nameSpan);
+      container.appendChild(dirEl);
+
+      var childrenEl = document.createElement('div');
+      childrenEl.className = subtreeHasCurrent(node) ? 'tree-children' : 'tree-children collapsed';
+      container.appendChild(childrenEl);
+
+      dirEl.addEventListener('click', function() {
+        childrenEl.classList.toggle('collapsed');
+      });
+
+      sortedChildren(node).forEach(function(child) {
+        renderNode(child, childrenEl, depth + 1);
+      });
+    } else {
+      var isCurrent = node.path === currentFilePath;
+      var fileEl = document.createElement('div');
+      fileEl.className = 'tree-item' + (isCurrent ? ' current' : '');
+      appendIndents(fileEl, depth);
+      fileEl.insertAdjacentHTML('beforeend', fileSvg);
+      var nameSpan2 = document.createElement('span');
+      nameSpan2.textContent = node.name;
+      fileEl.appendChild(nameSpan2);
+      container.appendChild(fileEl);
+
+      fileEl.addEventListener('click', function() {
+        if (node.path === currentFilePath) return;
+        switchToFile(node.path, fileEl);
+      });
+    }
+  }
+
+  function switchToFile(filePath, clickedEl) {
+    var sock = getPreviewSocket();
+    if (!sock) {
+      showToast('Preview not connected');
+      return;
+    }
+    sock.emit('open_md_file', { filePath: filePath }, function(result) {
+      if (!result || !result.ok) {
+        showToast('Failed to open file');
+        return;
+      }
+      saveAnnotations();
+
+      bufnr = String(result.bufnr);
+      currentFilePath = filePath;
+      var previewPath = '/page/' + bufnr;
+      frame.src = previewPath;
+      urlInput.value = window.location.origin + previewPath;
+
+      fileTreeList.querySelectorAll('.tree-item.current').forEach(function(el) {
+        el.classList.remove('current');
+      });
+      clickedEl.classList.add('current');
+
+      sourceContentSnapshot = '';
+      if (sourcePane.classList.contains('visible')) {
+        sourceLoadRetries = 0;
+        setTimeout(loadSourceFromServer, 500);
+      }
+    });
+  }
+
   // --- Init from query params ---
   const params = new URLSearchParams(window.location.search);
-  const bufnr = params.get('page');
+  let bufnr = params.get('page');
   if (bufnr) {
     const previewPath = '/page/' + bufnr;
     frame.src = previewPath;
@@ -2272,13 +2501,21 @@ body {
     });
   });
 
-  // G key to open global instruction modal
+  function isShortcutBlocked() {
+    var ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return true;
+    if (notePopover.classList.contains('visible') || confirmOverlay.classList.contains('visible')) return true;
+    if (globalModal.classList.contains('visible')) return true;
+    return false;
+  }
+
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'g' || e.key === 'G') {
-      if (toolbar.classList.contains('visible')) return;
-      if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
-      if (notePopover.classList.contains('visible') || confirmOverlay.classList.contains('visible')) return;
-      if (globalModal.classList.contains('visible')) return;
+    if ((e.key === 'f' || e.key === 'F') && !isShortcutBlocked()) {
+      e.preventDefault();
+      toggleFileTree();
+      return;
+    }
+    if ((e.key === 'g' || e.key === 'G') && !isShortcutBlocked() && !toolbar.classList.contains('visible')) {
       e.preventDefault();
       openGlobalModal();
     }

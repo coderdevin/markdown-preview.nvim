@@ -2071,7 +2071,7 @@ body {
     editingAnnotationIdx = idx;
     var t = ann.type || TYPE_MODIFY;
     notePopoverLabel.textContent = t === TYPE_GLOBAL ? 'Edit instruction' : 'Edit note';
-    notePopoverInput.placeholder = t === TYPE_GLOBAL ? 'Document instruction...' : t === TYPE_ADD ? 'What to add here?' : t === TYPE_DELETE ? 'Reason for deletion' : 'What should be changed?';
+    notePopoverInput.placeholder = t === TYPE_GLOBAL ? 'Document instruction...' : t === TYPE_ADD ? 'What to add here?' : t === TYPE_DELETE ? 'Why or how should this be removed?' : 'How should this be improved?';
     if (t === TYPE_GLOBAL) {
       notePopoverSelected.style.display = 'none';
     } else {
@@ -2139,7 +2139,7 @@ body {
     hideToolbar();
     popoverPosition = lastSelectionPos;
     notePopoverLabel.textContent = 'Modify';
-    notePopoverInput.placeholder = 'What should be changed?';
+    notePopoverInput.placeholder = 'How should this be improved?';
     openPopoverForNew(lastSelectionPos.x, lastSelectionPos.y);
   }
 
@@ -2154,19 +2154,12 @@ body {
 
   function doDeleteAction() {
     if (!currentSelection) return;
+    pendingType = TYPE_DELETE;
     hideToolbar();
-    var id = 'ann-' + (++highlightCounter);
-    var ann = {
-      id: id,
-      type: TYPE_DELETE,
-      text: currentSelection.text.substring(0, 500),
-      note: '',
-      context: currentSelection.text.substring(0, 60)
-    };
-    highlightRange(currentSelection.range, id, TYPE_DELETE);
-    try { frame.contentDocument.getSelection().removeAllRanges(); } catch(ex) {}
-    annotations.push(ann);
-    saveAnnotations();
+    popoverPosition = lastSelectionPos;
+    notePopoverLabel.textContent = 'Delete';
+    notePopoverInput.placeholder = 'Why or how should this be removed?';
+    openPopoverForNew(lastSelectionPos.x, lastSelectionPos.y);
     renderList();
     currentSelection = null;
     showToast('Marked for deletion');
@@ -2325,13 +2318,13 @@ body {
     let md = `[${annType}]\n`;
     if (ann.type === TYPE_DELETE) {
       md += `> ~~${text}~~\n`;
-      if (ann.note) md += `\n**Reason:** ${ann.note}\n`;
+      if (ann.note) md += `\n**Deletion direction:** ${ann.note}\n`;
     } else if (ann.type === TYPE_ADD) {
       md += `> ${text}\n`;
       if (ann.note) md += `\n**Add:** ${ann.note}\n`;
     } else {
       md += `> ${text}\n`;
-      if (ann.note) md += `\n**Change to:** ${ann.note}\n`;
+      if (ann.note) md += `\n**Rewrite direction:** ${ann.note}\n`;
     }
     return md;
   }
@@ -2380,9 +2373,9 @@ body {
     if (globalAnns.length > 0) {
       md += `- Document Instructions: apply each instruction to the entire document\n`;
     }
-    md += `- [MODIFY]: rewrite the quoted text according to the "Change to" instruction\n`;
-    md += `- [ADD]: write the new content according to the "Add" instruction\n`;
-    md += `- [DELETE]: remove the quoted text\n`;
+    md += `- [MODIFY]: rewrite and improve the quoted text based on the direction or suggestion provided — the note is guidance, not a literal replacement\n`;
+    md += `- [ADD]: insert new content after the quoted text based on the direction provided — the note is guidance, not a literal insertion\n`;
+    md += `- [DELETE]: remove or rework the quoted text based on the direction provided — the note explains why or how it should be removed\n`;
     md += `\nOutput the complete revised document in full. Do not summarize or skip sections.\n`;
 
     copyToClipboard(md);

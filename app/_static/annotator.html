@@ -2153,16 +2153,12 @@ body {
   }
 
   function doDeleteAction() {
-    if (!currentSelection) return;
     pendingType = TYPE_DELETE;
     hideToolbar();
     popoverPosition = lastSelectionPos;
     notePopoverLabel.textContent = 'Delete';
     notePopoverInput.placeholder = 'Why or how should this be removed?';
     openPopoverForNew(lastSelectionPos.x, lastSelectionPos.y);
-    renderList();
-    currentSelection = null;
-    showToast('Marked for deletion');
   }
 
   function handleToolbarKeydown(e) {

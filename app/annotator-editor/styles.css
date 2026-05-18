@@ -1,6 +1,6 @@
 /*
  * Milkdown theme overrides for the annotator.
- * Maps Crepe's design tokens to annotator.html's cream/warm palette.
+ * Mirrors the cream/warm palette defined in annotator.html.
  */
 
 .mdp-editor-wrapper {
@@ -25,34 +25,47 @@
   --crepe-color-inline-code: var(--accent, #C4704B);
   --crepe-color-error: var(--danger, #B85450);
   --crepe-color-hover: var(--bg-hover, #EAE6DD);
-  --crepe-color-selected: var(--accent-light, rgba(196,112,75,0.08));
+  --crepe-color-selected: var(--accent-wash, rgba(196,112,75,0.12));
   --crepe-color-inline-area: var(--bg-warm, #F0EDE6);
 
   --crepe-font-title: 'Source Serif 4', Georgia, 'Times New Roman', serif;
-  --crepe-font-default: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --crepe-font-default: 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --crepe-font-code: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
 
   --crepe-shadow-1:
-    0px 1px 3px 1px rgba(45, 42, 38, 0.10),
-    0px 1px 2px 0px rgba(45, 42, 38, 0.16);
+    0 1px 3px rgba(45,42,38,0.06),
+    0 1px 2px rgba(45,42,38,0.10);
   --crepe-shadow-2:
-    0px 2px 6px 2px rgba(45, 42, 38, 0.10),
-    0px 1px 2px 0px rgba(45, 42, 38, 0.16);
+    0 8px 24px rgba(45,42,38,0.10),
+    0 2px 6px rgba(45,42,38,0.06);
 
   outline: none;
   background: transparent;
-}
-
-.mdp-editor-wrapper .milkdown .ProseMirror {
-  padding: 24px 28px;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--text, #2D2A26);
-  font-family: var(--crepe-font-default);
-  word-wrap: break-word;
   min-height: 100%;
 }
 
+/* =============================================
+   Content container — centered with comfortable line length
+   ============================================= */
+.mdp-editor-wrapper .milkdown .ProseMirror {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 56px 96px;
+  font-family: var(--crepe-font-default);
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--text, #2D2A26);
+  word-wrap: break-word;
+  min-height: calc(100vh - 200px);
+}
+
+@media (max-width: 720px) {
+  .mdp-editor-wrapper .milkdown .ProseMirror {
+    padding: 24px 20px 64px;
+  }
+}
+
+/* --- Headings --- */
 .mdp-editor-wrapper .milkdown .ProseMirror h1,
 .mdp-editor-wrapper .milkdown .ProseMirror h2,
 .mdp-editor-wrapper .milkdown .ProseMirror h3,
@@ -60,65 +73,82 @@
 .mdp-editor-wrapper .milkdown .ProseMirror h5,
 .mdp-editor-wrapper .milkdown .ProseMirror h6 {
   font-family: var(--crepe-font-title);
-  font-weight: 700;
-  line-height: 1.3;
-  margin-top: 22px;
-  margin-bottom: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  margin: 1.8em 0 0.6em;
   padding: 0;
-  letter-spacing: -0.015em;
+  color: var(--text, #2D2A26);
 }
 .mdp-editor-wrapper .milkdown .ProseMirror h1 {
-  font-size: 2em;
-  padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--border, #DDD7CC);
+  font-size: 2.1em;
+  letter-spacing: -0.025em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--border-light, #E8E3D9);
+  margin-top: 0.8em;
 }
 .mdp-editor-wrapper .milkdown .ProseMirror h2 {
   font-size: 1.6em;
-  padding-bottom: 0.25em;
+  padding-bottom: 0.2em;
   border-bottom: 1px solid var(--border-light, #E8E3D9);
 }
-.mdp-editor-wrapper .milkdown .ProseMirror h3 { font-size: 1.35em; }
-.mdp-editor-wrapper .milkdown .ProseMirror h4 { font-size: 1.15em; }
+.mdp-editor-wrapper .milkdown .ProseMirror h3 { font-size: 1.3em; }
+.mdp-editor-wrapper .milkdown .ProseMirror h4 { font-size: 1.1em; }
 .mdp-editor-wrapper .milkdown .ProseMirror h5 { font-size: 1em; }
 .mdp-editor-wrapper .milkdown .ProseMirror h6 {
-  font-size: 1em;
+  font-size: 0.95em;
   color: var(--text-secondary, #6B6560);
 }
 
+/* --- Paragraphs & inline --- */
 .mdp-editor-wrapper .milkdown .ProseMirror p {
-  font-size: 14px;
-  line-height: 1.6;
-  margin: 0 0 14px 0;
+  margin: 0 0 1em 0;
 }
-
 .mdp-editor-wrapper .milkdown .ProseMirror a {
   color: var(--accent, #C4704B);
   text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent, #C4704B) 30%, transparent);
+  transition: border-color 180ms;
 }
-.mdp-editor-wrapper .milkdown .ProseMirror a:hover { text-decoration: underline; }
-
-.mdp-editor-wrapper .milkdown .ProseMirror strong { font-weight: 700; }
+.mdp-editor-wrapper .milkdown .ProseMirror a:hover {
+  border-bottom-color: var(--accent, #C4704B);
+}
+.mdp-editor-wrapper .milkdown .ProseMirror strong { font-weight: 700; color: var(--text, #2D2A26); }
 .mdp-editor-wrapper .milkdown .ProseMirror em { font-style: italic; }
-.mdp-editor-wrapper .milkdown .ProseMirror del { text-decoration: line-through; }
+.mdp-editor-wrapper .milkdown .ProseMirror del { text-decoration: line-through; color: var(--text-tertiary, #9B958C); }
 
+/* --- Lists --- */
 .mdp-editor-wrapper .milkdown .ProseMirror ul,
 .mdp-editor-wrapper .milkdown .ProseMirror ol {
-  padding-left: 1.8em;
-  margin: 0 0 14px 0;
+  padding-left: 1.7em;
+  margin: 0 0 1em 0;
 }
-.mdp-editor-wrapper .milkdown .ProseMirror li { margin-bottom: 4px; }
-.mdp-editor-wrapper .milkdown .ProseMirror li p { margin-bottom: 4px; }
+.mdp-editor-wrapper .milkdown .ProseMirror ul { list-style-type: disc; }
+.mdp-editor-wrapper .milkdown .ProseMirror ol { list-style-type: decimal; }
+.mdp-editor-wrapper .milkdown .ProseMirror li { margin: 0.15em 0; }
+.mdp-editor-wrapper .milkdown .ProseMirror li p { margin: 0.15em 0; }
+.mdp-editor-wrapper .milkdown .ProseMirror li[data-item-type="task"] {
+  list-style-type: none;
+}
+.mdp-editor-wrapper .milkdown .ProseMirror input[type="checkbox"] {
+  margin: 0 0.35em 0.2em -1.4em;
+  vertical-align: middle;
+  accent-color: var(--accent, #C4704B);
+}
 
+/* --- Blockquote --- */
 .mdp-editor-wrapper .milkdown .ProseMirror blockquote {
-  margin: 0 0 14px 0;
-  padding: 0 0 0 14px;
+  margin: 0 0 1em 0;
+  padding: 0.2em 0 0.2em 1em;
   color: var(--text-secondary, #6B6560);
   border-left: 3px solid var(--border, #DDD7CC);
+  font-style: italic;
 }
 .mdp-editor-wrapper .milkdown .ProseMirror blockquote::before { display: none; }
 
+/* --- HR --- */
 .mdp-editor-wrapper .milkdown .ProseMirror hr {
-  margin: 18px 0;
+  margin: 2em 0;
   border: 0;
   border-top: 1px solid var(--border, #DDD7CC);
   background: none;
@@ -126,37 +156,40 @@
   padding: 0;
 }
 
+/* --- Code --- */
 .mdp-editor-wrapper .milkdown .ProseMirror code {
   font-family: var(--crepe-font-code);
-  font-size: 85%;
-  padding: 0.18em 0.38em;
+  font-size: 0.88em;
+  padding: 0.15em 0.42em;
   background: var(--bg-warm, #F0EDE6);
-  border-radius: 3px;
-  color: var(--text, #2D2A26);
+  border: 1px solid var(--border-light, #E8E3D9);
+  border-radius: 4px;
+  color: var(--accent, #C4704B);
   display: inline;
 }
-
 .mdp-editor-wrapper .milkdown .ProseMirror pre {
-  padding: 14px 16px;
-  margin: 0 0 14px 0;
+  padding: 14px 18px;
+  margin: 0 0 1em 0;
   background: var(--bg-warm, #F0EDE6);
   border: 1px solid var(--border-light, #E8E3D9);
   border-radius: 6px;
-  font-size: 85%;
-  line-height: 1.5;
+  font-size: 0.88em;
+  line-height: 1.55;
   overflow: auto;
+  font-family: var(--crepe-font-code);
 }
 .mdp-editor-wrapper .milkdown .ProseMirror pre code {
   background: transparent;
   padding: 0;
+  border: 0;
+  color: var(--text, #2D2A26);
   font-size: 100%;
   border-radius: 0;
   white-space: pre;
 }
 
-.mdp-editor-wrapper .milkdown .milkdown-table-block {
-  margin-bottom: 14px;
-}
+/* --- Tables --- */
+.mdp-editor-wrapper .milkdown .milkdown-table-block { margin: 0 0 1em 0; }
 .mdp-editor-wrapper .milkdown .milkdown-table-block table {
   border-collapse: collapse;
   width: 100%;
@@ -167,44 +200,82 @@
   border-top: 1px solid var(--border, #DDD7CC);
 }
 .mdp-editor-wrapper .milkdown .milkdown-table-block tr:nth-child(2n) {
-  background: var(--bg-warm, #F0EDE6);
+  background: var(--bg-surface-warm, #FCFBF9);
 }
 .mdp-editor-wrapper .milkdown .milkdown-table-block th,
 .mdp-editor-wrapper .milkdown .milkdown-table-block td {
-  padding: 6px 12px;
+  padding: 8px 14px;
   border: 1px solid var(--border, #DDD7CC);
   vertical-align: top;
   text-align: left;
 }
-.mdp-editor-wrapper .milkdown .milkdown-table-block th { font-weight: 600; }
-
-.mdp-editor-wrapper .milkdown .milkdown-toolbar,
-.mdp-editor-wrapper .milkdown .milkdown-link-preview,
-.mdp-editor-wrapper .milkdown .milkdown-link-edit {
-  z-index: 9999;
+.mdp-editor-wrapper .milkdown .milkdown-table-block th {
+  font-weight: 600;
+  background: var(--bg-warm, #F0EDE6);
 }
 
+/* =============================================
+   Floating UI — toolbar / link tooltip / table handles
+   ============================================= */
+.mdp-editor-wrapper .milkdown .milkdown-toolbar,
+.mdp-editor-wrapper .milkdown .milkdown-link-preview,
+.mdp-editor-wrapper .milkdown .milkdown-link-edit,
 .milkdown-toolbar,
 .milkdown-link-preview,
 .milkdown-link-edit {
   background: var(--bg-surface, #FEFDFB);
   border: 1px solid var(--border, #DDD7CC);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(45,42,38,0.12), 0 2px 6px rgba(45,42,38,0.08);
+  border-radius: 10px;
+  box-shadow:
+    0 10px 30px rgba(45,42,38,0.14),
+    0 2px 6px rgba(45,42,38,0.06);
+  z-index: 9999;
+}
+.mdp-editor-wrapper .milkdown .milkdown-toolbar .toolbar-item:hover,
+.milkdown-toolbar .toolbar-item:hover {
+  background: var(--bg-hover, #EAE6DD);
+}
+.mdp-editor-wrapper .milkdown .milkdown-toolbar .toolbar-item.active svg,
+.milkdown-toolbar .toolbar-item.active svg {
+  color: var(--accent, #C4704B);
+  fill: var(--accent, #C4704B);
 }
 
-.mdp-editor-wrapper .milkdown .ProseMirror li[data-item-type="task"] {
-  list-style-type: none;
+/* Table cell handles */
+.mdp-editor-wrapper .milkdown .milkdown-table-block .cell-handle {
+  background: var(--bg-surface, #FEFDFB);
+  border: 1px solid var(--border, #DDD7CC);
+  box-shadow: 0 2px 6px rgba(45,42,38,0.08);
 }
-.mdp-editor-wrapper .milkdown .ProseMirror input[type="checkbox"] {
-  margin: 0 0.35em 0.25em -1.4em;
-  vertical-align: middle;
+.mdp-editor-wrapper .milkdown .milkdown-table-block .cell-handle .button-group {
+  background: var(--bg-surface, #FEFDFB);
+  border: 1px solid var(--border, #DDD7CC);
+  box-shadow: 0 4px 12px rgba(45,42,38,0.10);
+}
+.mdp-editor-wrapper .milkdown .milkdown-table-block .line-handle {
+  background-color: var(--accent, #C4704B);
 }
 
+/* =============================================
+   Selection — must beat Crepe + virtual-cursor defaults
+   ============================================= */
+.mdp-editor-wrapper .milkdown .ProseMirror::selection,
 .mdp-editor-wrapper .milkdown .ProseMirror *::selection {
-  background: var(--accent-wash, rgba(196,112,75,0.18)) !important;
+  background: color-mix(in srgb, var(--accent, #C4704B) 35%, transparent) !important;
+  color: inherit !important;
+}
+.mdp-editor-wrapper .milkdown .ProseMirror::-moz-selection,
+.mdp-editor-wrapper .milkdown .ProseMirror *::-moz-selection {
+  background: color-mix(in srgb, var(--accent, #C4704B) 35%, transparent) !important;
+  color: inherit !important;
 }
 
+/* Virtual cursor color — Crepe hides native caret */
+.mdp-editor-wrapper .milkdown .ProseMirror-focused {
+  --prosemirror-virtual-cursor-color: var(--accent, #C4704B);
+}
+
+/* Placeholder */
 .mdp-editor-wrapper .milkdown .milkdown-placeholder::before {
   color: var(--text-tertiary, #9B958C);
 }

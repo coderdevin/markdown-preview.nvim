@@ -153,9 +153,8 @@ body {
 }
 
 .source-pane {
-  width: 50%;
-  min-width: 320px;
-  border-right: 1px solid var(--border);
+  flex: 1;
+  min-width: 0;
   background: var(--bg-surface);
   display: none;
   flex-direction: column;
@@ -163,6 +162,11 @@ body {
 
 .source-pane.visible {
   display: flex;
+}
+
+/* When editing, the source pane takes the whole area — preview is hidden. */
+.preview-area:has(.source-pane.visible) .preview-pane {
+  display: none;
 }
 
 .source-header {

@@ -216,16 +216,28 @@ body {
 
 .source-editor {
   flex: 1;
+  min-height: 0;
   width: 100%;
   border: 0;
   outline: none;
-  resize: none;
-  padding: 12px 14px;
-  font-size: 13px;
-  line-height: 1.55;
-  font-family: var(--font-mono);
-  color: var(--text);
+  background: var(--bg-surface);
+  position: relative;
+  overflow: hidden;
 }
+.source-editor.mdp-editor-wrapper {
+  display: block;
+}
+.source-editor-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+.source-editor-loading.hidden { display: none; }
 
 .source-status {
   padding: 8px 12px;
@@ -1115,7 +1127,9 @@ body {
           <button class="source-btn save" id="saveSourceBtn">Save</button>
         </div>
       </div>
-      <textarea id="sourceEditor" class="source-editor" spellcheck="false" placeholder="Loading source..." aria-label="Markdown source editor"></textarea>
+      <div id="sourceEditor" class="source-editor" aria-label="Markdown source editor">
+        <div class="source-editor-loading" id="sourceEditorLoading">Loading editor...</div>
+      </div>
       <div class="source-status" id="sourceStatus">Source not loaded</div>
     </div>
     <div class="preview-pane">
@@ -1255,10 +1269,80 @@ body {
   toggleSourceBtn.addEventListener('click', function() {
     var isNowVisible = sourcePane.classList.toggle('visible');
     toggleSourceBtn.classList.toggle('active');
-    if (isNowVisible && !sourceContentSnapshot) {
-      loadSourceFromServer();
+    if (isNowVisible) {
+      ensureEditor().then(function() {
+        if (!sourceContentSnapshot) loadSourceFromServer();
+      });
     }
   });
+
+  // --- Lazy-load the Milkdown editor bundle ---
+  let editor = null;
+  let editorPromise = null;
+  const sourceEditorLoading = document.getElementById('sourceEditorLoading');
+
+  function loadScript(src) {
+    return new Promise(function(resolve, reject) {
+      var s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.onload = function() { resolve(); };
+      s.onerror = function() { reject(new Error('Failed to load ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadStyle(href) {
+    return new Promise(function(resolve, reject) {
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href;
+      link.onload = function() { resolve(); };
+      link.onerror = function() { reject(new Error('Failed to load ' + href)); };
+      document.head.appendChild(link);
+    });
+  }
+
+  function ensureEditor() {
+    if (editor) return Promise.resolve(editor);
+    if (editorPromise) return editorPromise;
+    sourceEditorLoading.classList.remove('hidden');
+    editorPromise = Promise.all([
+      loadStyle('milkdown.bundle.css'),
+      loadScript('milkdown.bundle.js')
+    ]).then(function() {
+      if (!window.MdpAnnotatorEditor || typeof window.MdpAnnotatorEditor.create !== 'function') {
+        throw new Error('Editor bundle loaded but global is missing');
+      }
+      return window.MdpAnnotatorEditor.create({
+        root: sourceEditor,
+        initialValue: '',
+        onChange: onEditorChange
+      });
+    }).then(function(handle) {
+      editor = handle;
+      sourceEditorLoading.classList.add('hidden');
+      return editor;
+    }).catch(function(err) {
+      sourceEditorLoading.textContent = 'Editor failed to load';
+      editorPromise = null;
+      throw err;
+    });
+    return editorPromise;
+  }
+
+  function onEditorChange(markdown) {
+    if (!editor) return;
+    if (markdown === sourceContentSnapshot) {
+      setSourceStatus('No unsaved changes');
+      return;
+    }
+    setSourceStatus('Unsaved changes...');
+    clearTimeout(sourceAutoSaveTimer);
+    sourceAutoSaveTimer = setTimeout(function() {
+      saveSourceToServer(true);
+    }, 900);
+  }
   const noteOverlay = document.getElementById('noteOverlay');
   const notePopover = document.getElementById('notePopover');
   const notePopoverLabel = document.getElementById('notePopoverLabel');
@@ -1654,7 +1738,8 @@ body {
       setSourceStatus('Loading source...');
       const result = await socketRequest('read_source', { bufnr: bufnr });
       const content = typeof result.content === 'string' ? result.content : '';
-      sourceEditor.value = content;
+      const handle = await ensureEditor();
+      handle.replaceContent(content);
       sourceContentSnapshot = content;
       setSourceStatus('Loaded from ' + (result.filePath || 'buffer'));
     } catch (e) {
@@ -1664,16 +1749,17 @@ body {
   }
 
   async function saveSourceToServer(silent) {
-    if (!bufnr || sourceSaving) return;
-    if (sourceEditor.value === sourceContentSnapshot) return;
+    if (!bufnr || sourceSaving || !editor) return;
+    const current = editor.getMarkdown();
+    if (current === sourceContentSnapshot) return;
     sourceSaving = true;
     try {
       setSourceStatus('Saving...');
       const result = await socketRequest('write_source', {
         bufnr: bufnr,
-        content: sourceEditor.value
+        content: current
       });
-      sourceContentSnapshot = sourceEditor.value;
+      sourceContentSnapshot = current;
       const now = new Date();
       setSourceStatus('Saved at ' + now.toLocaleTimeString() + ' · ' + (result.filePath || 'buffer'));
       if (!silent) {
@@ -1685,8 +1771,8 @@ body {
         try {
           const verify = await socketRequest('read_source', { bufnr: bufnr });
           const verifyContent = typeof verify.content === 'string' ? verify.content : '';
-          if (verifyContent === sourceEditor.value) {
-            sourceContentSnapshot = sourceEditor.value;
+          if (verifyContent === current) {
+            sourceContentSnapshot = current;
             const now = new Date();
             setSourceStatus('Saved at ' + now.toLocaleTimeString() + ' · delayed ack');
             if (!silent) {
@@ -1717,18 +1803,6 @@ body {
       e.preventDefault();
       saveSourceToServer(false);
     }
-  });
-
-  sourceEditor.addEventListener('input', function() {
-    if (sourceEditor.value === sourceContentSnapshot) {
-      setSourceStatus('No unsaved changes');
-      return;
-    }
-    setSourceStatus('Unsaved changes...');
-    clearTimeout(sourceAutoSaveTimer);
-    sourceAutoSaveTimer = setTimeout(function() {
-      saveSourceToServer(true);
-    }, 900);
   });
 
   // --- Inject highlight CSS into iframe ---

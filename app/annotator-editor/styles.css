@@ -3,10 +3,30 @@
  * Mirrors the cream/warm palette defined in annotator.html.
  */
 
+/*
+ * The host (#sourceEditor) is also `.source-editor`, a flex child of `.source-pane`
+ * with `flex: 1; min-height: 0`. Don't set `height: 100%` here — let flex sizing
+ * resolve the height. We just claim the scroll viewport and the background.
+ */
 .mdp-editor-wrapper {
-  height: 100%;
   overflow: auto;
   background: var(--bg-surface, #FEFDFB);
+  /* The host already has `position: relative` from `.source-editor`. */
+  /* Make this a flex container so .milkdown can fill it for click coverage. */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Make .milkdown fill the scroll viewport so its child .ProseMirror can flex
+   to full height — clicking blank space below the last paragraph lands in the
+   editor instead of doing nothing. */
+.mdp-editor-wrapper > .milkdown {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+.mdp-editor-wrapper > .milkdown > .ProseMirror {
+  flex: 1 0 auto;
 }
 
 .mdp-editor-wrapper .milkdown {
@@ -41,7 +61,6 @@
 
   outline: none;
   background: transparent;
-  min-height: 100%;
 }
 
 /* =============================================
@@ -49,14 +68,15 @@
    ============================================= */
 .mdp-editor-wrapper .milkdown .ProseMirror {
   max-width: 760px;
+  width: 100%;
   margin: 0 auto;
-  padding: 48px 56px 96px;
+  padding: 40px 48px 80px;
   font-family: var(--crepe-font-default);
   font-size: 16px;
   line-height: 1.7;
   color: var(--text, #2D2A26);
   word-wrap: break-word;
-  min-height: calc(100vh - 200px);
+  box-sizing: border-box;
 }
 
 @media (max-width: 720px) {
@@ -81,19 +101,19 @@
   color: var(--text, #2D2A26);
 }
 .mdp-editor-wrapper .milkdown .ProseMirror h1 {
-  font-size: 2.1em;
-  letter-spacing: -0.025em;
-  padding-bottom: 0.25em;
-  border-bottom: 1px solid var(--border-light, #E8E3D9);
-  margin-top: 0.8em;
-}
-.mdp-editor-wrapper .milkdown .ProseMirror h2 {
-  font-size: 1.6em;
+  font-size: 1.85em;
+  letter-spacing: -0.022em;
   padding-bottom: 0.2em;
   border-bottom: 1px solid var(--border-light, #E8E3D9);
+  margin-top: 0.6em;
 }
-.mdp-editor-wrapper .milkdown .ProseMirror h3 { font-size: 1.3em; }
-.mdp-editor-wrapper .milkdown .ProseMirror h4 { font-size: 1.1em; }
+.mdp-editor-wrapper .milkdown .ProseMirror h2 {
+  font-size: 1.45em;
+  padding-bottom: 0.18em;
+  border-bottom: 1px solid var(--border-light, #E8E3D9);
+}
+.mdp-editor-wrapper .milkdown .ProseMirror h3 { font-size: 1.2em; }
+.mdp-editor-wrapper .milkdown .ProseMirror h4 { font-size: 1.05em; }
 .mdp-editor-wrapper .milkdown .ProseMirror h5 { font-size: 1em; }
 .mdp-editor-wrapper .milkdown .ProseMirror h6 {
   font-size: 0.95em;
@@ -215,30 +235,114 @@
 }
 
 /* =============================================
-   Floating UI — toolbar / link tooltip / table handles
+   Floating UI — selection toolbar / link tooltip / link editor
+   Crepe places these inside .milkdown, so .mdp-editor-wrapper .milkdown … wins
+   over the bundle's own .milkdown … on equal specificity (loaded later).
    ============================================= */
 .mdp-editor-wrapper .milkdown .milkdown-toolbar,
-.mdp-editor-wrapper .milkdown .milkdown-link-preview,
-.mdp-editor-wrapper .milkdown .milkdown-link-edit,
-.milkdown-toolbar,
-.milkdown-link-preview,
-.milkdown-link-edit {
+.mdp-editor-wrapper .milkdown .milkdown-link-preview > .link-preview,
+.mdp-editor-wrapper .milkdown .milkdown-link-edit > .link-edit {
   background: var(--bg-surface, #FEFDFB);
   border: 1px solid var(--border, #DDD7CC);
   border-radius: 10px;
   box-shadow:
-    0 10px 30px rgba(45,42,38,0.14),
-    0 2px 6px rgba(45,42,38,0.06);
+    0 10px 28px rgba(45,42,38,0.16),
+    0 2px 6px rgba(45,42,38,0.08);
   z-index: 9999;
+  overflow: visible;
 }
-.mdp-editor-wrapper .milkdown .milkdown-toolbar .toolbar-item:hover,
-.milkdown-toolbar .toolbar-item:hover {
+
+.mdp-editor-wrapper .milkdown .milkdown-toolbar {
+  padding: 2px;
+  gap: 2px;
+}
+.mdp-editor-wrapper .milkdown .milkdown-toolbar .toolbar-item {
+  width: 30px;
+  height: 30px;
+  margin: 2px;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background 140ms;
+}
+.mdp-editor-wrapper .milkdown .milkdown-toolbar .toolbar-item svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary, #6B6560);
+  fill: var(--text-secondary, #6B6560);
+}
+.mdp-editor-wrapper .milkdown .milkdown-toolbar .toolbar-item:hover {
   background: var(--bg-hover, #EAE6DD);
 }
-.mdp-editor-wrapper .milkdown .milkdown-toolbar .toolbar-item.active svg,
-.milkdown-toolbar .toolbar-item.active svg {
+.mdp-editor-wrapper .milkdown .milkdown-toolbar .toolbar-item:hover svg {
+  color: var(--text, #2D2A26);
+  fill: var(--text, #2D2A26);
+}
+.mdp-editor-wrapper .milkdown .milkdown-toolbar .toolbar-item.active svg {
   color: var(--accent, #C4704B);
   fill: var(--accent, #C4704B);
+}
+.mdp-editor-wrapper .milkdown .milkdown-toolbar .divider {
+  background: var(--border-light, #E8E3D9);
+  margin: 6px 2px;
+  height: 20px;
+}
+
+/* Link preview/edit popovers */
+.mdp-editor-wrapper .milkdown .milkdown-link-preview > .link-preview,
+.mdp-editor-wrapper .milkdown .milkdown-link-edit > .link-edit {
+  height: auto;
+  min-height: 36px;
+  padding: 6px 10px;
+  align-items: center;
+}
+.mdp-editor-wrapper .milkdown .milkdown-link-preview > .link-preview > .link-display {
+  font-size: 13px;
+  color: var(--text, #2D2A26);
+}
+.mdp-editor-wrapper .milkdown .milkdown-link-edit > .link-edit > .input-area {
+  color: var(--text, #2D2A26);
+  font-size: 13px;
+}
+
+/* =============================================
+   BlockEdit — slash menu + drag handle
+   ============================================= */
+.mdp-editor-wrapper .milkdown .milkdown-slash-menu {
+  z-index: 9999;
+  background: var(--bg-surface, #FEFDFB);
+  border: 1px solid var(--border, #DDD7CC);
+  border-radius: 10px;
+  box-shadow:
+    0 10px 28px rgba(45,42,38,0.16),
+    0 2px 6px rgba(45,42,38,0.08);
+}
+.mdp-editor-wrapper .milkdown .milkdown-block-handle {
+  z-index: 9999;
+}
+.mdp-editor-wrapper .milkdown .milkdown-block-handle .operation-item svg {
+  fill: var(--text-tertiary, #9B958C);
+}
+.mdp-editor-wrapper .milkdown .milkdown-block-handle .operation-item:hover {
+  background: var(--bg-hover, #EAE6DD);
+}
+
+/* =============================================
+   CodeMirror code blocks — match .ProseMirror pre
+   ============================================= */
+.mdp-editor-wrapper .milkdown .milkdown-code-block {
+  background: var(--bg-warm, #F0EDE6);
+  border: 1px solid var(--border-light, #E8E3D9);
+  border-radius: 6px;
+  margin: 0 0 1em 0;
+}
+.mdp-editor-wrapper .milkdown .milkdown-code-block .cm-editor,
+.mdp-editor-wrapper .milkdown .milkdown-code-block .cm-gutters {
+  background: transparent;
+}
+.mdp-editor-wrapper .milkdown .milkdown-code-block .cm-content {
+  font-family: var(--crepe-font-code);
+  font-size: 0.88em;
+  line-height: 1.55;
 }
 
 /* Table cell handles */
@@ -275,7 +379,8 @@
   --prosemirror-virtual-cursor-color: var(--accent, #C4704B);
 }
 
-/* Placeholder */
-.mdp-editor-wrapper .milkdown .milkdown-placeholder::before {
+/* Placeholder (class renamed milkdown-placeholder → crepe-placeholder in Crepe 7.21) */
+.mdp-editor-wrapper .milkdown .milkdown-placeholder::before,
+.mdp-editor-wrapper .milkdown .crepe-placeholder::before {
   color: var(--text-tertiary, #9B958C);
 }

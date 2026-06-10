@@ -9,6 +9,8 @@ import { compressImageFile } from "./image-compress";
 import "@milkdown/crepe/theme/common/prosemirror.css";
 import "@milkdown/crepe/theme/common/reset.css";
 import "@milkdown/crepe/theme/common/cursor.css";
+import "@milkdown/crepe/theme/common/block-edit.css";
+import "@milkdown/crepe/theme/common/code-mirror.css";
 import "@milkdown/crepe/theme/common/link-tooltip.css";
 import "@milkdown/crepe/theme/common/list-item.css";
 import "@milkdown/crepe/theme/common/placeholder.css";
@@ -37,16 +39,22 @@ export async function create(options: CreateOptions): Promise<EditorHandle> {
   let suppressNextChange = false;
   let destroyed = false;
 
+  root.classList.add("mdp-editor-wrapper");
+
   const crepe = new Crepe({
     root,
     defaultValue: initialValue,
     features: {
-      [CrepeFeature.CodeMirror]: false,
       [CrepeFeature.ImageBlock]: false,
       [CrepeFeature.Latex]: false,
-      [CrepeFeature.BlockEdit]: false,
       [CrepeFeature.TopBar]: false,
       [CrepeFeature.AI]: false,
+    },
+    featureConfigs: {
+      [CrepeFeature.Placeholder]: {
+        text: "Type / for commands…",
+        mode: "block",
+      },
     },
   });
 
@@ -114,6 +122,7 @@ export async function create(options: CreateOptions): Promise<EditorHandle> {
     },
     destroy(): void {
       destroyed = true;
+      root.classList.remove("mdp-editor-wrapper");
       void crepe.destroy();
     },
   };

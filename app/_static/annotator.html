@@ -228,9 +228,6 @@ body {
   position: relative;
   overflow: hidden;
 }
-.source-editor.mdp-editor-wrapper {
-  display: block;
-}
 .source-editor-loading {
   position: absolute;
   inset: 0;
@@ -268,6 +265,47 @@ body {
   flex-direction: column;
   flex-shrink: 0;
 }
+.side-panel.collapsed { display: none; }
+
+/* Floating tab to re-expand the collapsed notes panel */
+.side-panel-expand {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px 10px 9px;
+  background: var(--bg-warm);
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  box-shadow: -2px 2px 10px rgba(45,42,38,0.10);
+  cursor: pointer;
+  z-index: 30;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+}
+.side-panel-expand.visible { display: inline-flex; }
+.side-panel-expand:hover { background: var(--bg-hover); color: var(--text); }
+.side-panel-expand .expand-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  display: none;
+  box-sizing: border-box;
+}
+.side-panel-expand .expand-count.visible { display: inline-block; }
 
 .panel-header {
   padding: 18px 20px 14px;
@@ -1028,8 +1066,8 @@ body {
 /* ── File Tree Panel ── */
 .file-tree-panel {
   display: none;
-  width: 260px;
-  min-width: 260px;
+  width: var(--tree-w, 260px);
+  min-width: var(--tree-w, 260px);
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
   overflow-y: auto;
@@ -1038,6 +1076,23 @@ body {
   font-size: 13px;
 }
 .file-tree-panel.visible { display: flex; flex-direction: column; }
+
+/* Drag handle on the file tree's right edge */
+.file-tree-resizer {
+  display: none;
+  width: 5px;
+  margin-left: -3px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  z-index: 5;
+  background: transparent;
+  transition: background 140ms;
+}
+.file-tree-panel.visible + .file-tree-resizer { display: block; }
+.file-tree-resizer:hover,
+.file-tree-resizer.dragging {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
 .file-tree-header {
   padding: 12px 14px 8px;
   font-weight: 600;
@@ -1122,6 +1177,7 @@ body {
       <div class="file-tree-loading">Loading...</div>
     </div>
   </div>
+  <div class="file-tree-resizer" id="fileTreeResizer" title="Drag to resize"></div>
   <div class="preview-area">
     <div class="source-pane">
       <div class="source-header">
@@ -1150,6 +1206,9 @@ body {
       <div class="panel-actions">
         <button class="btn-panel copy" id="copyAllBtn">Copy All</button>
         <button class="btn-panel clear" id="clearAllBtn">Clear</button>
+        <button class="btn-panel" id="collapseNotesBtn" title="Collapse notes panel (N)" aria-label="Collapse notes panel">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px" aria-hidden="true"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+        </button>
       </div>
     </div>
     <div class="global-instruction-trigger">
@@ -1163,6 +1222,12 @@ body {
     </div>
   </div>
 </div>
+
+<button class="side-panel-expand" id="expandNotesBtn" title="Expand notes panel (N)" aria-label="Expand notes panel">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
+  Notes
+  <span class="expand-count" id="expandNotesCount">0</span>
+</button>
 
 <div class="note-popover-overlay" id="noteOverlay"></div>
 <div class="note-popover" id="notePopover" role="dialog" aria-modal="true" aria-labelledby="notePopoverLabel">
@@ -1672,6 +1737,11 @@ body {
     lastCount = annotations.length;
     annCount.textContent = lastCount;
     annCount.classList.toggle('visible', lastCount > 0);
+    var expandBadge = document.getElementById('expandNotesCount');
+    if (expandBadge) {
+      expandBadge.textContent = lastCount;
+      expandBadge.classList.toggle('visible', lastCount > 0);
+    }
     copyAllBtn.textContent = lastCount > 0
       ? 'Copy All (' + lastCount + ')'
       : 'Copy All';
@@ -2241,6 +2311,7 @@ body {
 
   function handleToolbarKeydown(e) {
     if (!toolbar.classList.contains('visible')) return;
+    if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'm' || e.key === 'M') { e.preventDefault(); doModifyAction(); }
     if (e.key === 'a' || e.key === 'A') { e.preventDefault(); doAddAction(); }
     if (e.key === 'd' || e.key === 'D') { e.preventDefault(); doDeleteAction(); }
@@ -2567,12 +2638,14 @@ body {
   function isShortcutBlocked() {
     var ae = document.activeElement;
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return true;
+    if (ae && ae.isContentEditable) return true;
     if (notePopover.classList.contains('visible') || confirmOverlay.classList.contains('visible')) return true;
     if (globalModal.classList.contains('visible')) return true;
     return false;
   }
 
   document.addEventListener('keydown', (e) => {
+    if (e.isComposing || e.keyCode === 229) return;
     if ((e.key === 'f' || e.key === 'F') && !isShortcutBlocked()) {
       e.preventDefault();
       toggleFileTree();
@@ -2605,6 +2678,75 @@ body {
       observer.observe(doc.body, { childList: true, subtree: true });
     } catch(e) {}
   }
+
+  // --- Notes panel collapse ---
+  var sidePanel = document.querySelector('.side-panel');
+  var collapseNotesBtn = document.getElementById('collapseNotesBtn');
+  var expandNotesBtn = document.getElementById('expandNotesBtn');
+  var expandNotesCount = document.getElementById('expandNotesCount');
+  var NOTES_COLLAPSED_KEY = 'mdp-notes-collapsed';
+
+  function setNotesCollapsed(collapsed, persist) {
+    sidePanel.classList.toggle('collapsed', collapsed);
+    expandNotesBtn.classList.toggle('visible', collapsed);
+    if (persist !== false) {
+      try { localStorage.setItem(NOTES_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch (e) {}
+    }
+  }
+  collapseNotesBtn.addEventListener('click', function() { setNotesCollapsed(true); });
+  expandNotesBtn.addEventListener('click', function() { setNotesCollapsed(false); });
+  try {
+    if (localStorage.getItem(NOTES_COLLAPSED_KEY) === '1') setNotesCollapsed(true, false);
+  } catch (e) {}
+
+  document.addEventListener('keydown', (e) => {
+    if (e.isComposing || e.keyCode === 229) return;
+    if ((e.key === 'n' || e.key === 'N') && !isShortcutBlocked() && !toolbar.classList.contains('visible')) {
+      e.preventDefault();
+      setNotesCollapsed(!sidePanel.classList.contains('collapsed'));
+    }
+  });
+
+  // --- File tree resize ---
+  var fileTreeResizer = document.getElementById('fileTreeResizer');
+  var TREE_WIDTH_KEY = 'mdp-tree-width';
+  var TREE_MIN_W = 170;
+  var TREE_MAX_W = 560;
+
+  function applyTreeWidth(w) {
+    fileTreePanel.style.setProperty('--tree-w', w + 'px');
+  }
+  try {
+    var savedTreeW = parseInt(localStorage.getItem(TREE_WIDTH_KEY), 10);
+    if (savedTreeW >= TREE_MIN_W && savedTreeW <= TREE_MAX_W) applyTreeWidth(savedTreeW);
+  } catch (e) {}
+
+  fileTreeResizer.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    var startX = e.clientX;
+    var startW = fileTreePanel.getBoundingClientRect().width;
+    fileTreeResizer.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    // The preview iframe swallows mouse events; disable them during the drag.
+    frame.style.pointerEvents = 'none';
+    function onMove(ev) {
+      applyTreeWidth(Math.max(TREE_MIN_W, Math.min(TREE_MAX_W, startW + ev.clientX - startX)));
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      fileTreeResizer.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      frame.style.pointerEvents = '';
+      try {
+        localStorage.setItem(TREE_WIDTH_KEY, String(Math.round(fileTreePanel.getBoundingClientRect().width)));
+      } catch (e) {}
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
 
   // --- Init ---
   loadAnnotations();

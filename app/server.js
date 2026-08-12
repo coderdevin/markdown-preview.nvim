@@ -9,6 +9,7 @@ exports.run = function () {
   const opener = require('./lib/util/opener')
   const logger = require('./lib/util/logger')('app/server')
   const { applyInlineChangesToContent } = require('./lib/util/applyInlineChanges')
+  const { computeContentHash, checkWriteConflict } = require('./lib/util/writeConflict')
   const { resolveBufferPath } = require('./lib/util/resolveBufferPath')
   const { getIP } = require('./lib/util/getIP')
   const routes = require('./routes')
@@ -66,6 +67,8 @@ exports.run = function () {
 
     clients[bufnr] = clients[bufnr] || []
     clients[bufnr].push(client)
+    // The buffer this client currently previews; changes on preview_file switch
+    let activeBufnr = bufnr
     // update vim variable
     update_clients_active_var();
 
@@ -215,6 +218,7 @@ exports.run = function () {
         reply({
           ok: true,
           content,
+          version: computeContentHash(content),
           filePath: resolvedFilePath
         })
       } catch (e) {
@@ -223,7 +227,7 @@ exports.run = function () {
       }
     })
 
-    client.on('write_source', async ({ bufnr: updateBufnr, content }, done) => {
+    client.on('write_source', async ({ bufnr: updateBufnr, content, baseline }, done) => {
       const reply = safeReply(done)
       try {
         const targetBufnr = Number(updateBufnr || bufnr)
@@ -246,11 +250,25 @@ exports.run = function () {
 
         const nvimCwd = await plugin.nvim.call('getcwd')
         const resolvedFilePath = resolveBufferPath(filePath, nvimCwd)
+
+        // Refuse to overwrite a file that changed on disk since the editor
+        // loaded it (e.g. edited and saved in nvim meanwhile).
+        if (baseline) {
+          const onDisk = await fs.promises.readFile(resolvedFilePath, 'utf-8')
+          const check = checkWriteConflict(onDisk, baseline)
+          if (check.conflict) {
+            logger.warn('write_source conflict: ', resolvedFilePath)
+            reply({ ok: false, conflict: true, error: 'file changed on disk', version: check.currentHash })
+            return
+          }
+        }
+
         await fs.promises.writeFile(resolvedFilePath, content, 'utf-8')
         await plugin.nvim.command('checktime')
         logger.info('source write: chars=', content.length, 'path=', resolvedFilePath)
         reply({
           ok: true,
+          version: computeContentHash(content),
           filePath: resolvedFilePath
         })
         // Refresh preview after reply so the callback isn't lost
@@ -325,6 +343,23 @@ exports.run = function () {
         }
         const content = convertFrontmatter((await fs.promises.readFile(filePath, 'utf-8')).split(/\r?\n/))
 
+        // Make the file a real nvim buffer so read_source/write_source/update_lines
+        // can target it — otherwise they keep resolving the original buffer and
+        // the editor reads/writes the wrong file after a tree switch.
+        const newBufnr = await plugin.nvim.call('bufadd', [filePath])
+        await plugin.nvim.call('bufload', [newBufnr])
+        // Move this client's registration to the new bufnr: nvim-side events
+        // for the previous buffer must no longer reach a client that now
+        // previews a different file.
+        if (String(activeBufnr) !== String(newBufnr)) {
+          clients[activeBufnr] = (clients[activeBufnr] || []).filter(c => c.id !== client.id)
+        }
+        clients[newBufnr] = clients[newBufnr] || []
+        if (!clients[newBufnr].some(c => c.id === client.id)) {
+          clients[newBufnr].push(client)
+        }
+        activeBufnr = newBufnr
+
         const [options, pageTitle, theme] = await Promise.all([
           plugin.nvim.getVar('mkdp_preview_options'),
           plugin.nvim.getVar('mkdp_page_title'),
@@ -342,7 +377,7 @@ exports.run = function () {
           name: filePath,
           content
         })
-        reply({ ok: true })
+        reply({ ok: true, bufnr: newBufnr })
       } catch (e) {
         logger.error('preview_file error: ', e)
         reply({ ok: false, error: String((e && e.message) || e) })
@@ -351,7 +386,11 @@ exports.run = function () {
 
     client.on('disconnect', function () {
       logger.info('disconnect: ', client.id)
-      clients[bufnr] = (clients[bufnr] || []).filter(c => c.id !== client.id)
+      // The client may have been re-registered under other bufnrs via
+      // preview_file — remove it from every bucket.
+      Object.keys(clients).forEach(key => {
+        clients[key] = (clients[key] || []).filter(c => c.id !== client.id)
+      })
       // update vim variable
       update_clients_active_var();
     })

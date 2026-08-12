@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Markdown Annotator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -17,7 +18,7 @@
   --border-light: #E8E3D9;
   --text: #2D2A26;
   --text-secondary: #6B6560;
-  --text-tertiary: #9B958C;
+  --text-tertiary: #7A746B; /* darkened from #9B958C for WCAG AA on --bg */
   --accent: #C4704B;
   --accent-hover: #B5613D;
   --accent-light: rgba(196, 112, 75, 0.08);
@@ -32,12 +33,14 @@
   --global-light: rgba(124, 107, 186, 0.08);
   --global-wash: rgba(124, 107, 186, 0.12);
   --radius: 10px;
+  --radius-md: 10px;
   --radius-sm: 6px;
   --shadow-sm: 0 1px 3px rgba(45, 42, 38, 0.06);
   --shadow-md: 0 4px 12px rgba(45, 42, 38, 0.08), 0 1px 3px rgba(45, 42, 38, 0.06);
   --shadow-lg: 0 8px 30px rgba(45, 42, 38, 0.12), 0 2px 8px rgba(45, 42, 38, 0.06);
-  --font-display: 'Source Serif 4', Georgia, 'Times New Roman', serif;
-  --font-ui: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* CJK fallbacks are explicit: Source Serif 4 / DM Sans carry no Chinese glyphs */
+  --font-display: 'Source Serif 4', 'Noto Serif SC', 'Songti SC', 'STSong', Georgia, 'Times New Roman', serif;
+  --font-ui: 'DM Sans', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
   --transition: 180ms cubic-bezier(0.25, 0, 0, 1);
 }
@@ -212,10 +215,27 @@ body {
 .source-btn.save {
   border-color: var(--accent);
   color: var(--accent);
+  min-width: 72px;
 }
 
 .source-btn.save:hover {
   background: var(--accent-light);
+}
+
+/* Save button states: dirty = solid accent, saving = held, saved = quiet check */
+.source-btn.save.dirty {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.source-btn.save.dirty:hover { background: var(--accent-hover); }
+.source-btn.save.saving {
+  opacity: 0.65;
+  pointer-events: none;
+}
+.source-btn.save.saved {
+  border-color: var(--border);
+  color: var(--success);
 }
 
 .source-editor {
@@ -240,6 +260,24 @@ body {
 }
 .source-editor-loading.hidden { display: none; }
 
+/* Editor scroll viewport — match the thin scrollbar used by .ann-list */
+.source-editor { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.source-editor::-webkit-scrollbar { width: 8px; }
+.source-editor::-webkit-scrollbar-track { background: transparent; }
+.source-editor::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+.source-editor::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+/* Full Width applies to the editor too (id selector outweighs the bundle CSS) */
+#sourceEditor.full-width .milkdown .ProseMirror { max-width: none; }
+
+/* Editor typography follows the shared font tokens (adds CJK fallbacks the
+   bundled theme lacks) */
+#sourceEditor .milkdown {
+  --crepe-font-title: var(--font-display);
+  --crepe-font-default: var(--font-display);
+  --crepe-font-code: var(--font-mono);
+}
+
 .source-status {
   padding: 8px 12px;
   border-top: 1px solid var(--border-light);
@@ -257,8 +295,8 @@ body {
 
 /* ── Side panel ── */
 .side-panel {
-  width: 320px;
-  min-width: 320px;
+  width: var(--notes-w, 320px);
+  min-width: var(--notes-w, 320px);
   background: var(--bg-warm);
   border-left: 1px solid var(--border);
   display: flex;
@@ -266,6 +304,22 @@ body {
   flex-shrink: 0;
 }
 .side-panel.collapsed { display: none; }
+
+/* Drag handle on the notes panel's left edge (mirrors the file tree resizer) */
+.notes-resizer {
+  width: 5px;
+  margin-right: -3px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  z-index: 5;
+  background: transparent;
+  transition: background 140ms;
+}
+.notes-resizer:hover,
+.notes-resizer.dragging {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.main:has(.side-panel.collapsed) .notes-resizer { display: none; }
 
 /* Floating tab to re-expand the collapsed notes panel */
 .side-panel-expand {
@@ -504,7 +558,9 @@ body {
 }
 
 .ann-item:hover .remove-btn,
-.ann-item:hover .copy-btn { opacity: 1; }
+.ann-item:hover .copy-btn,
+.ann-item:focus-within .remove-btn,
+.ann-item:focus-within .copy-btn { opacity: 1; }
 .ann-item .remove-btn:hover {
   background: var(--danger-light);
   color: var(--danger);
@@ -1197,6 +1253,7 @@ body {
     </div>
   </div>
 
+  <div class="notes-resizer" id="notesResizer" title="Drag to resize"></div>
   <div class="side-panel">
     <div class="panel-header">
       <div class="panel-title">
@@ -1241,8 +1298,8 @@ body {
 </div>
 
 <div class="global-modal-overlay" id="globalModalOverlay"></div>
-<div class="global-modal" id="globalModal" role="dialog" aria-modal="true">
-  <div class="global-modal-title">Document Instruction</div>
+<div class="global-modal" id="globalModal" role="dialog" aria-modal="true" aria-labelledby="globalModalTitle">
+  <div class="global-modal-title" id="globalModalTitle">Document Instruction</div>
   <textarea id="globalModalInput" rows="3" placeholder="Enter an instruction to apply to the entire document..."></textarea>
   <div class="global-modal-presets">
     <button class="preset-chip" data-preset="Translate this document to Chinese">Translate to Chinese</button>
@@ -1287,6 +1344,8 @@ body {
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<script src="save-scheduler.js"></script>
+<script src="frontmatter.js"></script>
 <script>
 (function() {
   'use strict';
@@ -1335,14 +1394,30 @@ body {
   const globalModalSave = document.getElementById('globalModalSave');
   const globalModalPresets = globalModal.querySelector('.global-modal-presets');
 
-  toggleSourceBtn.addEventListener('click', function() {
-    var isNowVisible = sourcePane.classList.toggle('visible');
-    toggleSourceBtn.classList.toggle('active');
-    if (isNowVisible) {
+  var emptyStateHintDefault = null;
+  function updateEmptyStateHint(editing) {
+    var p = emptyState.querySelector('p');
+    if (!p) return;
+    if (emptyStateHintDefault === null) emptyStateHintDefault = p.innerHTML;
+    p.innerHTML = editing
+      ? 'Annotations pause while editing the source. Close the editor to select text again.'
+      : emptyStateHintDefault;
+  }
+
+  function setSourcePaneVisible(visible) {
+    sourcePane.classList.toggle('visible', visible);
+    toggleSourceBtn.classList.toggle('active', visible);
+    toggleSourceBtn.textContent = visible ? 'Close Editor' : 'Edit Source';
+    updateEmptyStateHint(visible);
+    if (visible) {
       ensureEditor().then(function() {
         if (!sourceContentSnapshot) loadSourceFromServer();
       });
     }
+  }
+
+  toggleSourceBtn.addEventListener('click', function() {
+    setSourcePaneVisible(!sourcePane.classList.contains('visible'));
   });
 
   // --- Lazy-load the Milkdown editor bundle ---
@@ -1404,13 +1479,12 @@ body {
     if (!editor) return;
     if (markdown === sourceContentSnapshot) {
       setSourceStatus('No unsaved changes');
+      setSaveButtonState('saved');
       return;
     }
     setSourceStatus('Unsaved changes...');
-    clearTimeout(sourceAutoSaveTimer);
-    sourceAutoSaveTimer = setTimeout(function() {
-      saveSourceToServer(true);
-    }, 900);
+    setSaveButtonState('dirty');
+    saveScheduler.notifyChange();
   }
   const noteOverlay = document.getElementById('noteOverlay');
   const notePopover = document.getElementById('notePopover');
@@ -1425,9 +1499,22 @@ body {
   let currentSelection = null;
   let highlightCounter = 0;
   let toastTimer = null;
-  let sourceContentSnapshot = '';
-  let sourceAutoSaveTimer = null;
-  let sourceSaving = false;
+  let sourceContentSnapshot = ''; // editor body only, frontmatter excluded
+  let sourceFrontmatter = ''; // raw YAML header held out of the editor, spliced back on save
+  let sourceVersion = ''; // server-side content hash; echoed back on save for conflict detection
+  let sourceLoadedBufnr = ''; // which buffer the editor content belongs to
+  let manualSaveRequested = false;
+  const saveScheduler = MdpSaveScheduler.createSaveScheduler({
+    save: function() {
+      const silent = !manualSaveRequested;
+      manualSaveRequested = false;
+      return saveSourceToServer(silent);
+    }
+  });
+  function requestManualSave() {
+    manualSaveRequested = true;
+    saveScheduler.requestSave();
+  }
   let isPreviewFullWidth = false;
 
   function updateWidthButtonState() {
@@ -1458,6 +1545,8 @@ body {
     isPreviewFullWidth = !isPreviewFullWidth;
     updateWidthButtonState();
     applyPreviewWidthMode();
+    // Width mode applies to the source editor as well as the preview
+    sourceEditor.classList.toggle('full-width', isPreviewFullWidth);
   });
 
   updateWidthButtonState();
@@ -1590,14 +1679,28 @@ body {
       }
       saveAnnotations();
       currentFilePath = filePath;
+      // Drop any scheduled/buffered save — it belongs to the previous file.
+      // (An in-flight save is safe: it is bound to its own saveBufnr.)
+      saveScheduler.cancel();
+      sourceLoadedBufnr = '';
+      setSaveButtonState('idle');
+      setSourceStatus('Source not loaded');
+      // Point source read/write and inline edits at the switched buffer
+      if (result.bufnr) {
+        bufnr = String(result.bufnr);
+        urlInput.value = window.location.origin + '/page/' + bufnr;
+      } else {
+        urlInput.value = filePath;
+      }
 
       fileTreeList.querySelectorAll('.tree-item.current').forEach(function(el) {
         el.classList.remove('current');
       });
       clickedEl.classList.add('current');
-      urlInput.value = filePath;
 
       sourceContentSnapshot = '';
+      sourceFrontmatter = '';
+      sourceVersion = '';
       if (sourcePane.classList.contains('visible')) {
         sourceLoadRetries = 0;
         setTimeout(loadSourceFromServer, 500);
@@ -1760,6 +1863,26 @@ body {
     sourceStatusEl.textContent = msg;
   }
 
+  // Save button state machine: idle | dirty | saving | saved.
+  // saveState is the source of truth; the button classes only render it.
+  var saveState = 'idle';
+  function setSaveButtonState(state) {
+    saveState = state;
+    saveSourceBtn.classList.remove('dirty', 'saving', 'saved');
+    if (state === 'dirty') {
+      saveSourceBtn.classList.add('dirty');
+      saveSourceBtn.textContent = 'Save';
+    } else if (state === 'saving') {
+      saveSourceBtn.classList.add('saving');
+      saveSourceBtn.textContent = 'Saving…';
+    } else if (state === 'saved') {
+      saveSourceBtn.classList.add('saved');
+      saveSourceBtn.textContent = 'Saved ✓';
+    } else {
+      saveSourceBtn.textContent = 'Save';
+    }
+  }
+
   function getPreviewSocket() {
     return frame.contentWindow && frame.contentWindow.socket;
   }
@@ -1786,7 +1909,9 @@ body {
 
       sock.emit(event, payload, function(result) {
         if (!result || !result.ok) {
-          settle(reject, new Error(result && result.error ? result.error : event + ' failed'));
+          var err = new Error(result && result.error ? result.error : event + ' failed');
+          err.result = result;
+          settle(reject, err);
           return;
         }
         settle(resolve, result);
@@ -1808,13 +1933,24 @@ body {
       return;
     }
     sourceLoadRetries = 0;
+    // Bind this load to the buffer it was issued for: if the user switches
+    // files while read_source is in flight, drop the stale response instead
+    // of stamping old content with the new bufnr.
+    const loadBufnr = bufnr;
     try {
       setSourceStatus('Loading source...');
-      const result = await socketRequest('read_source', { bufnr: bufnr });
+      const result = await socketRequest('read_source', { bufnr: loadBufnr });
+      if (bufnr !== loadBufnr) return;
       const content = typeof result.content === 'string' ? result.content : '';
+      const parts = MdpFrontmatter.splitFrontmatter(content);
       const handle = await ensureEditor();
-      handle.replaceContent(content);
-      sourceContentSnapshot = content;
+      if (bufnr !== loadBufnr) return;
+      handle.replaceContent(parts.body);
+      sourceFrontmatter = parts.frontmatter;
+      sourceContentSnapshot = parts.body;
+      sourceVersion = result.version || '';
+      sourceLoadedBufnr = loadBufnr;
+      setSaveButtonState('saved');
       setSourceStatus('Loaded from ' + (result.filePath || 'buffer'));
     } catch (e) {
       setSourceStatus('Load failed');
@@ -1822,31 +1958,54 @@ body {
     }
   }
 
+  // Concurrency and lost-change handling live in saveScheduler — always call
+  // this through the scheduler, never directly.
   async function saveSourceToServer(silent) {
-    if (!bufnr || sourceSaving || !editor) return;
+    if (!bufnr || !editor) return;
+    // Never write content that belongs to a different buffer (file-tree switch
+    // in progress: bufnr changed but the editor still shows the old file).
+    if (sourceLoadedBufnr !== bufnr) return;
+    const saveBufnr = bufnr;
     const current = editor.getMarkdown();
     if (current === sourceContentSnapshot) return;
-    sourceSaving = true;
+    const fullContent = MdpFrontmatter.joinFrontmatter(sourceFrontmatter, current);
+    // The user may keep typing (or switch files) while the request is in
+    // flight — only mark "saved" if the editor still shows what was written.
+    const stillCurrent = () => bufnr === saveBufnr && editor.getMarkdown() === current;
     try {
       setSourceStatus('Saving...');
+      setSaveButtonState('saving');
       const result = await socketRequest('write_source', {
-        bufnr: bufnr,
-        content: current
+        bufnr: saveBufnr,
+        content: fullContent,
+        baseline: sourceVersion
       });
+      if (bufnr !== saveBufnr) return; // switched files mid-save: state belongs to the new file now
       sourceContentSnapshot = current;
+      sourceVersion = result.version || '';
+      setSaveButtonState(stillCurrent() ? 'saved' : 'dirty');
       const now = new Date();
       setSourceStatus('Saved at ' + now.toLocaleTimeString() + ' · ' + (result.filePath || 'buffer'));
       if (!silent) {
         showToast('Source saved');
       }
     } catch (e) {
+      if (bufnr !== saveBufnr) return; // switched files mid-save: don't touch the new file's state
+      if (e && e.result && e.result.conflict) {
+        setSaveButtonState('dirty');
+        setSourceStatus('File changed on disk — Reload to load the new version');
+        showToast('Save blocked: file changed outside the editor');
+        return;
+      }
       const message = String((e && e.message) || e || '');
       if (message.includes('timeout')) {
         try {
-          const verify = await socketRequest('read_source', { bufnr: bufnr });
+          const verify = await socketRequest('read_source', { bufnr: saveBufnr });
           const verifyContent = typeof verify.content === 'string' ? verify.content : '';
-          if (verifyContent === current) {
+          if (bufnr === saveBufnr && verifyContent === fullContent) {
             sourceContentSnapshot = current;
+            sourceVersion = verify.version || '';
+            setSaveButtonState(stillCurrent() ? 'saved' : 'dirty');
             const now = new Date();
             setSourceStatus('Saved at ' + now.toLocaleTimeString() + ' · delayed ack');
             if (!silent) {
@@ -1856,26 +2015,35 @@ body {
           }
         } catch (_) {}
       }
+      if (bufnr !== saveBufnr) return;
 
+      setSaveButtonState('dirty');
       setSourceStatus('Save failed');
       showToast('Source save failed');
-    } finally {
-      sourceSaving = false;
     }
   }
 
   reloadSourceBtn.addEventListener('click', function() {
+    // Guard: reloading with unsaved edits silently discards them
+    if (saveState === 'dirty' || saveState === 'saving') {
+      showConfirm(function() { loadSourceFromServer(); }, {
+        title: 'Discard unsaved changes?',
+        message: 'Reloading will replace the editor content with the file on disk.',
+        okLabel: 'Discard & Reload'
+      });
+      return;
+    }
     loadSourceFromServer();
   });
 
   saveSourceBtn.addEventListener('click', function() {
-    saveSourceToServer(false);
+    requestManualSave();
   });
 
   sourceEditor.addEventListener('keydown', function(e) {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
       e.preventDefault();
-      saveSourceToServer(false);
+      requestManualSave();
     }
   });
 
@@ -2351,10 +2519,13 @@ body {
   });
 
   // --- Render ---
+  var renderedAnnIds = new Set();
+
   function renderList() {
     updateCount();
 
     if (annotations.length === 0) {
+      renderedAnnIds = new Set();
       annList.innerHTML = '';
       annList.appendChild(emptyState);
       emptyState.style.display = '';
@@ -2363,6 +2534,7 @@ body {
 
     emptyState.style.display = 'none';
     annList.innerHTML = '';
+    var newItemCount = 0;
 
     annotations.forEach((ann, idx) => {
       if (idx > 0 && ann.type !== TYPE_GLOBAL && annotations[idx - 1].type === TYPE_GLOBAL) {
@@ -2375,7 +2547,12 @@ body {
       const item = document.createElement('div');
       item.className = 'ann-item';
       item.dataset.id = ann.id;
-      item.style.animationDelay = (idx * 30) + 'ms';
+      // Only newly added items animate in; re-renders keep existing items still
+      if (renderedAnnIds.has(ann.id)) {
+        item.style.animation = 'none';
+      } else {
+        item.style.animationDelay = (newItemCount++ * 30) + 'ms';
+      }
 
       const annType = ann.type || TYPE_MODIFY;
       item.dataset.type = annType;
@@ -2423,6 +2600,8 @@ body {
 
       annList.appendChild(item);
     });
+
+    renderedAnnIds = new Set(annotations.map(a => a.id));
   }
 
   function escapeHtml(str) {
@@ -2552,7 +2731,11 @@ body {
 
   var releaseFocusTrap = null;
 
-  function showConfirm(onConfirm) {
+  function showConfirm(onConfirm, opts) {
+    opts = opts || {};
+    document.getElementById('confirmTitle').textContent = opts.title || 'Are you sure?';
+    document.getElementById('confirmMessage').textContent = opts.message || 'This action cannot be undone.';
+    confirmOk.textContent = opts.okLabel || 'Confirm';
     confirmOverlay.classList.add('visible');
     releaseFocusTrap = trapFocus(confirmOverlay.querySelector('.confirm-dialog'));
     function onKey(e) { if (e.key === 'Escape') cleanup(); }
@@ -2583,22 +2766,30 @@ body {
       }
       renderList();
       showToast('All annotations cleared');
+    }, {
+      title: 'Clear all annotations?',
+      message: 'This will remove all annotations and highlights from this document. This cannot be undone.',
+      okLabel: 'Clear All'
     });
   });
 
   document.addEventListener('mousedown', () => { hideToolbar(); });
 
   // --- Global document instructions (modal) ---
+  var releaseGlobalTrap = null;
+
   function openGlobalModal() {
     globalModalInput.value = '';
     globalModal.classList.add('visible');
     globalModalOverlay.classList.add('visible');
+    releaseGlobalTrap = trapFocus(globalModal);
     setTimeout(() => globalModalInput.focus(), 50);
   }
 
   function closeGlobalModal() {
     globalModal.classList.remove('visible');
     globalModalOverlay.classList.remove('visible');
+    if (releaseGlobalTrap) { releaseGlobalTrap(); releaseGlobalTrap = null; }
   }
 
   function addGlobalNote(note) {
@@ -2655,6 +2846,9 @@ body {
       e.preventDefault();
       openGlobalModal();
     }
+    if (e.key === 'Escape' && sourcePane.classList.contains('visible') && !isShortcutBlocked()) {
+      setSourcePaneVisible(false);
+    }
   });
 
   function observeIframeChanges() {
@@ -2707,45 +2901,63 @@ body {
     }
   });
 
-  // --- File tree resize ---
-  var fileTreeResizer = document.getElementById('fileTreeResizer');
-  var TREE_WIDTH_KEY = 'mdp-tree-width';
-  var TREE_MIN_W = 170;
-  var TREE_MAX_W = 560;
+  // --- Panel column resizers ---
+  // Shared drag-to-resize behaviour: clamp, persist, and disable iframe mouse
+  // capture during the drag. `sign` is +1 when dragging right widens the
+  // panel (left-side panel) and -1 when dragging left widens it (right-side).
+  function initColumnResizer(opts) {
+    try {
+      var saved = parseInt(localStorage.getItem(opts.storageKey), 10);
+      if (saved >= opts.min && saved <= opts.max) opts.apply(saved);
+    } catch (e) {}
 
-  function applyTreeWidth(w) {
-    fileTreePanel.style.setProperty('--tree-w', w + 'px');
+    opts.handle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      var startX = e.clientX;
+      var startW = opts.measure();
+      opts.handle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      // The preview iframe swallows mouse events; disable them during the drag.
+      frame.style.pointerEvents = 'none';
+      function onMove(ev) {
+        var w = startW + (ev.clientX - startX) * opts.sign;
+        opts.apply(Math.max(opts.min, Math.min(opts.max, w)));
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        opts.handle.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        frame.style.pointerEvents = '';
+        try {
+          localStorage.setItem(opts.storageKey, String(Math.round(opts.measure())));
+        } catch (e) {}
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
   }
-  try {
-    var savedTreeW = parseInt(localStorage.getItem(TREE_WIDTH_KEY), 10);
-    if (savedTreeW >= TREE_MIN_W && savedTreeW <= TREE_MAX_W) applyTreeWidth(savedTreeW);
-  } catch (e) {}
 
-  fileTreeResizer.addEventListener('mousedown', function(e) {
-    e.preventDefault();
-    var startX = e.clientX;
-    var startW = fileTreePanel.getBoundingClientRect().width;
-    fileTreeResizer.classList.add('dragging');
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    // The preview iframe swallows mouse events; disable them during the drag.
-    frame.style.pointerEvents = 'none';
-    function onMove(ev) {
-      applyTreeWidth(Math.max(TREE_MIN_W, Math.min(TREE_MAX_W, startW + ev.clientX - startX)));
-    }
-    function onUp() {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      fileTreeResizer.classList.remove('dragging');
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      frame.style.pointerEvents = '';
-      try {
-        localStorage.setItem(TREE_WIDTH_KEY, String(Math.round(fileTreePanel.getBoundingClientRect().width)));
-      } catch (e) {}
-    }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+  initColumnResizer({
+    handle: document.getElementById('notesResizer'),
+    storageKey: 'mdp-notes-width',
+    min: 240,
+    max: 560,
+    sign: -1,
+    apply: function(w) { sidePanel.style.setProperty('--notes-w', w + 'px'); },
+    measure: function() { return sidePanel.getBoundingClientRect().width; }
+  });
+
+  initColumnResizer({
+    handle: document.getElementById('fileTreeResizer'),
+    storageKey: 'mdp-tree-width',
+    min: 170,
+    max: 560,
+    sign: 1,
+    apply: function(w) { fileTreePanel.style.setProperty('--tree-w', w + 'px'); },
+    measure: function() { return fileTreePanel.getBoundingClientRect().width; }
   });
 
   // --- Init ---

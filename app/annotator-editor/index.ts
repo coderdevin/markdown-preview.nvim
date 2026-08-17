@@ -1,5 +1,6 @@
 import { Crepe, CrepeFeature } from "@milkdown/crepe";
 import { editorViewCtx, parserCtx } from "@milkdown/core";
+import { EditorView } from "@codemirror/view";
 import { uploadConfig } from "@milkdown/plugin-upload";
 import { missingNodeInSchema } from "@milkdown/exception";
 import { compressImageFile } from "./image-compress";
@@ -54,6 +55,12 @@ export async function create(options: CreateOptions): Promise<EditorHandle> {
       [CrepeFeature.Placeholder]: {
         text: "Type / for commands…",
         mode: "block",
+      },
+      [CrepeFeature.CodeMirror]: {
+        // Typora-style code blocks: soft-wrap long lines instead of
+        // horizontal scrolling. Line numbers/active-line chrome from
+        // basicSetup are hidden in styles.css.
+        extensions: [EditorView.lineWrapping],
       },
     },
   });
